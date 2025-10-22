@@ -11,7 +11,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   const [error, setError] = useState('');
 
   // Safely check for process.env. This is the standard way to access env vars
-  // that are injected at build time by tools like Vite, Webpack, etc.
+  // that are injected at build time by services like Vercel.
   // We check `typeof process` to avoid a ReferenceError in environments where it's not defined.
   const adminUserFromEnv = typeof process !== 'undefined' ? process.env.VITE_ADMIN_USERNAME : undefined;
   const adminPassFromEnv = typeof process !== 'undefined' ? process.env.VITE_ADMIN_PASSWORD : undefined;
@@ -21,7 +21,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Use environment variables for credentials, with fallbacks for local development
+    // Use environment variables if they exist, otherwise fall back to insecure defaults for local development.
     const adminUser = adminUserFromEnv || 'admin';
     const adminPass = adminPassFromEnv || 'password';
 
@@ -48,15 +48,15 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                         <WarningIcon className="h-5 w-5 text-amber-400" aria-hidden="true" />
                     </div>
                     <div className="ml-3">
-                        <h3 className="text-sm font-medium text-amber-800">Action Required: Set Secure Credentials</h3>
+                        <h3 className="text-sm font-medium text-amber-800">Action Required: Secure Your Admin Login</h3>
                         <div className="mt-2 text-sm text-amber-700">
-                            <p className="font-bold text-amber-900">Warning: This method is for simple access control, not high security. Your credentials will be visible in the browser's code.</p>
-                            <p className="mt-2">Your admin login is using insecure default credentials. To protect your site, please set environment variables in your hosting provider (e.g., Vercel).</p>
+                             <p className="mb-2">Your site is using insecure default credentials. For security, please set your own credentials in your hosting provider (e.g., Vercel).</p>
+                             <p className="font-semibold text-amber-900">Note: This is for simple access control, not high security.</p>
                             <ul className="list-disc list-inside mt-2 space-y-1">
-                                <li>Go to your project's <strong>Settings &gt; Environment Variables</strong>.</li>
-                                <li>Add a variable named <code className="bg-amber-100 text-amber-900 px-1 rounded-sm text-xs">VITE_ADMIN_USERNAME</code> with your desired username.</li>
-                                <li>Add another named <code className="bg-amber-100 text-amber-900 px-1 rounded-sm text-xs">VITE_ADMIN_PASSWORD</code> with a strong password.</li>
-                                <li><strong>Redeploy</strong> your project for the changes to take effect.</li>
+                                <li>In your project's <strong>Settings &gt; Environment Variables</strong>:</li>
+                                <li>Add <code className="bg-amber-100 text-amber-900 px-1 rounded-sm text-xs">VITE_ADMIN_USERNAME</code> with your username.</li>
+                                <li>Add <code className="bg-amber-100 text-amber-900 px-1 rounded-sm text-xs">VITE_ADMIN_PASSWORD</code> with your password.</li>
+                                <li>You must <strong>Redeploy</strong> your project for the new variables to apply.</li>
                             </ul>
                         </div>
                     </div>
