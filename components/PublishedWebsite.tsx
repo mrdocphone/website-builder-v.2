@@ -4,14 +4,21 @@ import type { WebsiteData } from '../types';
 import Preview from './Preview';
 
 const PublishedWebsite: React.FC = () => {
-  const { data } = useParams<{ data: string }>();
+  const { slugAndData } = useParams<{ slugAndData: string }>();
   const [websiteData, setWebsiteData] = useState<WebsiteData | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (data) {
+    if (slugAndData) {
       try {
-        const decodedString = decodeURIComponent(window.atob(data));
+        const parts = slugAndData.split('--');
+        const base64Data = parts.pop();
+
+        if (!base64Data) {
+          throw new Error("Invalid URL format: Missing data.");
+        }
+
+        const decodedString = decodeURIComponent(window.atob(base64Data));
         const parsedData = JSON.parse(decodedString);
         
         // Updated validation for the new section-based data structure
@@ -28,7 +35,7 @@ const PublishedWebsite: React.FC = () => {
     } else {
       setError("No website data provided in the link.");
     }
-  }, [data]);
+  }, [slugAndData]);
 
   if (error) {
     return (

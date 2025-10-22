@@ -96,7 +96,12 @@ const Editor: React.FC<EditorProps> = ({ websiteData, setWebsiteData, onLogout }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setWebsiteData(prev => ({ ...prev, [name]: value }));
+    if (name === 'slug') {
+      const slugified = value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+      setWebsiteData(prev => ({ ...prev, slug: slugified }));
+    } else {
+      setWebsiteData(prev => ({ ...prev, [name]: value }));
+    }
   };
 
   const handleThemeChange = (theme: Theme) => {
@@ -116,10 +121,23 @@ const Editor: React.FC<EditorProps> = ({ websiteData, setWebsiteData, onLogout }
 
   const handlePublish = () => {
     try {
-      const jsonString = JSON.stringify(websiteData);
+      const slugify = (text: string) => (text || '').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+      const slug = websiteData.slug && websiteData.slug.trim() !== '' 
+        ? websiteData.slug 
+        : slugify(websiteData.businessName);
+
+      // Update state in case we had to generate a slug from an empty field
+      if (slug !== websiteData.slug) {
+        setWebsiteData(prev => ({ ...prev, slug }));
+      }
+
+      const dataToPublish = { ...websiteData, slug };
+      const jsonString = JSON.stringify(dataToPublish);
       const base64String = window.btoa(encodeURIComponent(jsonString));
-      const url = `${window.location.origin}${window.location.pathname}#/site/${base64String}`;
+      const url = `${window.location.origin}${window.location.pathname}#/site/${slug}--${base64String}`;
+      
       setPublishedUrl(url);
+      window.open(url, '_blank', 'noopener,noreferrer');
       setShowPublishModal(true);
     } catch(e) {
       console.error("Failed to publish", e);
@@ -328,7 +346,7 @@ const renderSectionForm = (section: Section) => {
     <div className="flex flex-col lg:flex-row h-screen font-sans bg-slate-100">
       <aside className="w-full lg:w-[400px] p-6 bg-white border-r border-slate-200 overflow-y-auto">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-slate-800">Site Builder</h1>
+          <h1 className="text-2xl font-bold text-slate-800">Gen-Z Builder</h1>
           <div className="flex items-center space-x-2">
             <button
               onClick={handlePublish}
@@ -361,6 +379,11 @@ const renderSectionForm = (section: Section) => {
               <div>
                 <label className="text-sm font-medium text-slate-600 block mb-1">Tagline</label>
                 <input type="text" name="tagline" value={websiteData.tagline} onChange={handleInputChange} className="w-full p-2 border border-slate-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500" />
+              </div>
+               <div>
+                <label className="text-sm font-medium text-slate-600 block mb-1">Website Slug</label>
+                <input type="text" name="slug" value={websiteData.slug} onChange={handleInputChange} placeholder="my-cool-business" className="w-full p-2 border border-slate-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500" />
+                <p className="text-xs text-slate-500 mt-1">Used for the shareable URL. Lowercase letters, numbers, and dashes only.</p>
               </div>
                <div>
                 <label className="text-sm font-medium text-slate-600 block mb-1">Hero Image</label>

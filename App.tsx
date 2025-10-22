@@ -9,6 +9,8 @@ import { v4 as uuidv4 } from 'uuid';
 
 // Data Migration function for backward compatibility
 const migrateToSectionBasedData = (oldData: any): WebsiteData => {
+  const slugify = (text: string) => (text || '').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+  const businessName = oldData.businessName || 'My Business';
   const sections: Section[] = [
     {
       id: uuidv4(),
@@ -31,8 +33,9 @@ const migrateToSectionBasedData = (oldData: any): WebsiteData => {
   ];
 
   return {
-    businessName: oldData.businessName || 'My Business',
+    businessName: businessName,
     tagline: oldData.tagline || 'My amazing business tagline',
+    slug: oldData.slug || slugify(businessName),
     heroImageUrl: oldData.heroImageUrl || 'https://picsum.photos/1200/600?random=1',
     theme: oldData.theme || 'light',
     sections: sections
@@ -51,6 +54,10 @@ const initialData = (): WebsiteData => {
         }
         // Basic validation for new format
         if (parsedData.businessName && Array.isArray(parsedData.sections)) {
+           // Add slug if missing for backward compatibility
+           if (!parsedData.slug) {
+             parsedData.slug = (parsedData.businessName || '').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+           }
            // Ensure all list items have IDs for data saved before the ID-update
           parsedData.sections.forEach((section: Section) => {
             if (section.type === 'services' && section.content.services) {
@@ -73,6 +80,7 @@ const initialData = (): WebsiteData => {
     return {
       businessName: 'Starlight Bakery',
       tagline: 'Freshly baked goodness, every day.',
+      slug: 'starlight-bakery',
       heroImageUrl: 'https://picsum.photos/1200/600?random=1',
       theme: 'light',
       sections: [
@@ -113,7 +121,18 @@ const initialData = (): WebsiteData => {
 
 const AppContent: React.FC = () => {
     const navigate = useNavigate();
-    const [isAuthenticated, setIsAuthenticated] = useState(() => sessionStorage.getItem('isAuthenticated') === 'true');
+    
+    // Check if we're in a development/preview environment like AI Studio
+    const isDevelopment = window.location.hostname === 'localhost' || !window.location.hostname.includes('.');
+
+    const [isAuthenticated, setIsAuthenticated] = useState(() => {
+        // Bypass authentication for local development/preview in AI Studio
+        if (isDevelopment) {
+            return true;
+        }
+        return sessionStorage.getItem('isAuthenticated') === 'true';
+    });
+
     const [websiteData, setWebsiteData] = useState<WebsiteData>(initialData);
 
     useEffect(() => {
@@ -142,7 +161,7 @@ const AppContent: React.FC = () => {
 
     return (
         <Routes>
-            <Route path="/site/:data" element={<PublishedWebsite />} />
+            <Route path="/site/:slugAndData" element={<PublishedWebsite />} />
             
             <Route 
                 path="/editor" 

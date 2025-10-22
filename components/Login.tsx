@@ -63,8 +63,8 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     <div className="flex items-center justify-center min-h-screen bg-slate-100 font-sans p-4">
       <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-xl">
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-slate-800">Admin Login</h1>
-          <p className="mt-2 text-slate-600">Access the AI Website Builder</p>
+          <h1 className="text-3xl font-bold text-slate-800">Gen-Z Builder Login</h1>
+          <p className="mt-2 text-slate-600">Access the Gen-Z Builder</p>
         </div>
         
         {isSetupMissing && (

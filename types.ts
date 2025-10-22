@@ -27,6 +27,7 @@ export type SectionType = Section['type'];
 export interface WebsiteData {
   businessName: string;
   tagline: string;
+  slug: string;
   heroImageUrl: string;
   theme: Theme;
   sections: Section[];
