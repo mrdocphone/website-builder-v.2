@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { HashRouter, Routes, Route } from 'react-router-dom';
+import { HashRouter, Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 import Editor from './components/Editor';
 import PublishedWebsite from './components/PublishedWebsite';
+import Login from './components/Login';
 import type { WebsiteData, Section } from './types';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -38,9 +39,7 @@ const migrateToSectionBasedData = (oldData: any): WebsiteData => {
   };
 };
 
-
-const App: React.FC = () => {
-  const initialData = (): WebsiteData => {
+const initialData = (): WebsiteData => {
     try {
       const savedData = localStorage.getItem('websiteData');
       if (savedData) {
@@ -54,11 +53,11 @@ const App: React.FC = () => {
         if (parsedData.businessName && Array.isArray(parsedData.sections)) {
            // Ensure all list items have IDs for data saved before the ID-update
           parsedData.sections.forEach((section: Section) => {
-            if (section.type === 'services') {
+            if (section.type === 'services' && section.content.services) {
               section.content.services.forEach(item => { if (!item.id) item.id = uuidv4() });
-            } else if (section.type === 'gallery') {
+            } else if (section.type === 'gallery' && section.content.images) {
               section.content.images.forEach(item => { if (!item.id) item.id = uuidv4() });
-            } else if (section.type === 'testimonials') {
+            } else if (section.type === 'testimonials' && section.content.testimonials) {
               section.content.testimonials.forEach(item => { if (!item.id) item.id = uuidv4() });
             }
           });
@@ -111,30 +110,73 @@ const App: React.FC = () => {
     };
   };
 
-  const [websiteData, setWebsiteData] = useState<WebsiteData>(initialData);
 
-  useEffect(() => {
-    // A simple debounce to prevent excessive writes to localStorage
-    const handler = setTimeout(() => {
-      try {
-        localStorage.setItem('websiteData', JSON.stringify(websiteData));
-      } catch (e) {
-        console.error("Failed to save website data to localStorage", e);
-      }
-    }, 500);
+const AppContent: React.FC = () => {
+    const navigate = useNavigate();
+    const [isAuthenticated, setIsAuthenticated] = useState(() => sessionStorage.getItem('isAuthenticated') === 'true');
+    const [websiteData, setWebsiteData] = useState<WebsiteData>(initialData);
 
-    return () => {
-      clearTimeout(handler);
+    useEffect(() => {
+        const handler = setTimeout(() => {
+        try {
+            localStorage.setItem('websiteData', JSON.stringify(websiteData));
+        } catch (e) {
+            console.error("Failed to save website data to localStorage", e);
+        }
+        }, 500);
+
+        return () => clearTimeout(handler);
+    }, [websiteData]);
+
+    const handleLoginSuccess = () => {
+        sessionStorage.setItem('isAuthenticated', 'true');
+        setIsAuthenticated(true);
+        navigate('/editor');
     };
-  }, [websiteData]);
 
+    const handleLogout = () => {
+        sessionStorage.removeItem('isAuthenticated');
+        setIsAuthenticated(false);
+        navigate('/');
+    };
 
+    return (
+        <Routes>
+            <Route path="/site/:data" element={<PublishedWebsite />} />
+            
+            <Route 
+                path="/editor" 
+                element={
+                    isAuthenticated ? (
+                        <Editor 
+                            websiteData={websiteData} 
+                            setWebsiteData={setWebsiteData}
+                            onLogout={handleLogout}
+                        />
+                    ) : (
+                        <Navigate to="/" replace />
+                    )
+                }
+            />
+            
+            <Route 
+                path="/" 
+                element={
+                    isAuthenticated ? (
+                        <Navigate to="/editor" replace />
+                    ) : (
+                        <Login onLoginSuccess={handleLoginSuccess} />
+                    )
+                }
+            />
+        </Routes>
+    );
+};
+
+const App: React.FC = () => {
   return (
     <HashRouter>
-      <Routes>
-        <Route path="/" element={<Editor websiteData={websiteData} setWebsiteData={setWebsiteData} />} />
-        <Route path="/site/:data" element={<PublishedWebsite />} />
-      </Routes>
+      <AppContent />
     </HashRouter>
   );
 };

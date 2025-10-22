@@ -5,7 +5,7 @@ import { generateSectionContent } from '../services/geminiService';
 import { 
     MagicWandIcon, LinkIcon, ClipboardCopyIcon, XIcon, PlusIcon, TrashIcon, 
     ArrowUpIcon, ArrowDownIcon, PencilIcon, AboutIcon, ServicesIcon, GalleryIcon,
-    TestimonialsIcon, ContactIcon
+    TestimonialsIcon, ContactIcon, LogoutIcon
 } from './icons';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -20,6 +20,7 @@ const SECTION_DEFAULTS = {
 interface EditorProps {
   websiteData: WebsiteData;
   setWebsiteData: React.Dispatch<React.SetStateAction<WebsiteData>>;
+  onLogout: () => void;
 }
 
 const PublishModal: React.FC<{ url: string; onClose: () => void }> = ({ url, onClose }) => {
@@ -85,7 +86,7 @@ const AddSectionModal: React.FC<{ onAdd: (type: SectionType) => void; onClose: (
     );
 };
 
-const Editor: React.FC<EditorProps> = ({ websiteData, setWebsiteData }) => {
+const Editor: React.FC<EditorProps> = ({ websiteData, setWebsiteData, onLogout }) => {
   const [isGenerating, setIsGenerating] = useState<string | null>(null); // section ID
   const [error, setError] = useState<string | null>(null);
   const [showPublishModal, setShowPublishModal] = useState(false);
@@ -328,13 +329,22 @@ const renderSectionForm = (section: Section) => {
       <aside className="w-full lg:w-[400px] p-6 bg-white border-r border-slate-200 overflow-y-auto">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold text-slate-800">Site Builder</h1>
-          <button
-            onClick={handlePublish}
-            className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
-          >
-            <LinkIcon className="w-4 h-4 mr-2" />
-            Publish & Share
-          </button>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={handlePublish}
+              className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
+            >
+              <LinkIcon className="w-4 h-4 mr-2" />
+              Publish & Share
+            </button>
+            <button 
+              onClick={onLogout}
+              title="Logout"
+              className="p-2 bg-slate-200 text-slate-600 rounded-md hover:bg-slate-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
+            >
+                <LogoutIcon className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Form Sections */}
