@@ -134,7 +134,7 @@ const Editor: React.FC<EditorProps> = ({ websiteData, setWebsiteData, onLogout }
       const dataToPublish = { ...websiteData, slug };
       const jsonString = JSON.stringify(dataToPublish);
       const base64String = window.btoa(encodeURIComponent(jsonString));
-      const url = `${window.location.origin}${window.location.pathname}#/site/${slug}--${base64String}`;
+      const url = `${window.location.origin}/site/${slug}--${base64String}`;
       
       setPublishedUrl(url);
       window.open(url, '_blank', 'noopener,noreferrer');
