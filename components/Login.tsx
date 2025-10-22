@@ -10,11 +10,11 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
-  // Safely check for process.env. This is the standard way to access env vars
-  // that are injected at build time by services like Vercel.
-  // We check `typeof process` to avoid a ReferenceError in environments where it's not defined.
-  const adminUserFromEnv = typeof process !== 'undefined' ? process.env.VITE_ADMIN_USERNAME : undefined;
-  const adminPassFromEnv = typeof process !== 'undefined' ? process.env.VITE_ADMIN_PASSWORD : undefined;
+  // Safely access environment variables.
+  // The `NEXT_PUBLIC_` prefix is a standard convention for exposing variables to the browser
+  // build on platforms like Vercel, which this project uses.
+  const adminUserFromEnv = typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_ADMIN_USERNAME : undefined;
+  const adminPassFromEnv = typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_ADMIN_PASSWORD : undefined;
 
   const isProductionSetupMissing = !adminUserFromEnv || !adminPassFromEnv;
 
@@ -54,8 +54,8 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                              <p className="font-semibold text-amber-900">Note: This is for simple access control, not high security.</p>
                             <ul className="list-disc list-inside mt-2 space-y-1">
                                 <li>In your project's <strong>Settings &gt; Environment Variables</strong>:</li>
-                                <li>Add <code className="bg-amber-100 text-amber-900 px-1 rounded-sm text-xs">VITE_ADMIN_USERNAME</code> with your username.</li>
-                                <li>Add <code className="bg-amber-100 text-amber-900 px-1 rounded-sm text-xs">VITE_ADMIN_PASSWORD</code> with your password.</li>
+                                <li>Add <code className="bg-amber-100 text-amber-900 px-1 rounded-sm text-xs">NEXT_PUBLIC_ADMIN_USERNAME</code> with your username.</li>
+                                <li>Add <code className="bg-amber-100 text-amber-900 px-1 rounded-sm text-xs">NEXT_PUBLIC_ADMIN_PASSWORD</code> with your password.</li>
                                 <li>You must <strong>Redeploy</strong> your project for the new variables to apply.</li>
                             </ul>
                         </div>

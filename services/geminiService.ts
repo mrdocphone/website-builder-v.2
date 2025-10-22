@@ -8,11 +8,11 @@ const getAiClient = (): GoogleGenAI => {
     if (ai) {
         return ai;
     }
-    // Safely access the API key from `process.env`, which is populated at build time.
-    // The VITE_ prefix is a convention that hosting providers like Vercel use to expose variables to the browser build.
-    const apiKey = typeof process !== 'undefined' ? process.env.VITE_API_KEY : undefined;
+    // Safely access the API key from `process.env`.
+    // The `NEXT_PUBLIC_` prefix is a standard convention for exposing variables to the browser build on platforms like Vercel.
+    const apiKey = typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_API_KEY : undefined;
     if (!apiKey) {
-        throw new Error("VITE_API_KEY environment variable not set. Please configure it in your Vercel project settings.");
+        throw new Error("NEXT_PUBLIC_API_KEY environment variable not set. Please configure it in your Vercel project settings.");
     }
     ai = new GoogleGenAI({ apiKey });
     return ai;
@@ -159,7 +159,7 @@ export const generateSectionContent = async (
 
   } catch (error) {
     console.error("Error generating content with Gemini API:", error);
-    if (error instanceof Error && error.message.startsWith("VITE_API_KEY")) {
+    if (error instanceof Error && error.message.startsWith("NEXT_PUBLIC_API_KEY")) {
         throw error;
     }
     throw new Error("Failed to generate content. The AI service may be temporarily unavailable.");
