@@ -8,9 +8,10 @@ const getAiClient = (): GoogleGenAI => {
     if (ai) {
         return ai;
     }
-    const apiKey = process.env.API_KEY;
+    // VITE_ prefix is required to expose env vars to the client-side code.
+    const apiKey = process.env.VITE_API_KEY;
     if (!apiKey) {
-        throw new Error("API_KEY environment variable not set. Please configure it in your Vercel project settings.");
+        throw new Error("VITE_API_KEY environment variable not set. Please configure it in your Vercel project settings.");
     }
     ai = new GoogleGenAI({ apiKey });
     return ai;
@@ -157,7 +158,7 @@ export const generateSectionContent = async (
 
   } catch (error) {
     console.error("Error generating content with Gemini API:", error);
-    if (error instanceof Error && error.message.startsWith("API_KEY")) {
+    if (error instanceof Error && error.message.startsWith("VITE_API_KEY")) {
         throw error;
     }
     throw new Error("Failed to generate content. The AI service may be temporarily unavailable.");

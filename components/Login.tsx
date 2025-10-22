@@ -11,14 +11,15 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   const [error, setError] = useState('');
 
   // Check if secure environment variables are missing.
-  const isProductionSetupMissing = !process.env.ADMIN_USERNAME || !process.env.ADMIN_PASSWORD;
+  // VITE_ prefix is required to expose env vars to the client-side code.
+  const isProductionSetupMissing = !process.env.VITE_ADMIN_USERNAME || !process.env.VITE_ADMIN_PASSWORD;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
     // Use environment variables for credentials, with fallbacks for local development
-    const adminUser = process.env.ADMIN_USERNAME || 'admin';
-    const adminPass = process.env.ADMIN_PASSWORD || 'password';
+    const adminUser = process.env.VITE_ADMIN_USERNAME || 'admin';
+    const adminPass = process.env.VITE_ADMIN_PASSWORD || 'password';
 
     if (username === adminUser && password === adminPass) {
       setError('');
@@ -45,11 +46,12 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                     <div className="ml-3">
                         <h3 className="text-sm font-medium text-amber-800">Action Required: Set Secure Credentials</h3>
                         <div className="mt-2 text-sm text-amber-700">
-                            <p>Your admin login is using insecure default credentials. To protect your site, please set environment variables in your hosting provider (e.g., Vercel).</p>
+                            <p className="font-bold text-amber-900">Warning: This method is for simple access control, not high security. Your credentials will be visible in the browser's code.</p>
+                            <p className="mt-2">Your admin login is using insecure default credentials. To protect your site, please set environment variables in your hosting provider (e.g., Vercel).</p>
                             <ul className="list-disc list-inside mt-2 space-y-1">
                                 <li>Go to your project's <strong>Settings &gt; Environment Variables</strong>.</li>
-                                <li>Add a variable named <code className="bg-amber-100 text-amber-900 px-1 rounded-sm text-xs">ADMIN_USERNAME</code> with your desired username.</li>
-                                <li>Add another named <code className="bg-amber-100 text-amber-900 px-1 rounded-sm text-xs">ADMIN_PASSWORD</code> with a strong password.</li>
+                                <li>Add a variable named <code className="bg-amber-100 text-amber-900 px-1 rounded-sm text-xs">VITE_ADMIN_USERNAME</code> with your desired username.</li>
+                                <li>Add another named <code className="bg-amber-100 text-amber-900 px-1 rounded-sm text-xs">VITE_ADMIN_PASSWORD</code> with a strong password.</li>
                                 <li>Redeploy your project for the changes to take effect.</li>
                             </ul>
                         </div>
