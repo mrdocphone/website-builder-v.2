@@ -8,8 +8,9 @@ const getAiClient = (): GoogleGenAI => {
     if (ai) {
         return ai;
     }
-    // VITE_ prefix is required to expose env vars to the client-side code.
-    const apiKey = process.env.VITE_API_KEY;
+    // Safely access the API key from `process.env`, which is populated at build time.
+    // The VITE_ prefix is a convention that hosting providers like Vercel use to expose variables to the browser build.
+    const apiKey = typeof process !== 'undefined' ? process.env.VITE_API_KEY : undefined;
     if (!apiKey) {
         throw new Error("VITE_API_KEY environment variable not set. Please configure it in your Vercel project settings.");
     }

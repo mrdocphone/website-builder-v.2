@@ -10,16 +10,20 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
-  // Check if secure environment variables are missing.
-  // VITE_ prefix is required to expose env vars to the client-side code.
-  const isProductionSetupMissing = !process.env.VITE_ADMIN_USERNAME || !process.env.VITE_ADMIN_PASSWORD;
+  // Safely check for process.env. This is the standard way to access env vars
+  // that are injected at build time by tools like Vite, Webpack, etc.
+  // We check `typeof process` to avoid a ReferenceError in environments where it's not defined.
+  const adminUserFromEnv = typeof process !== 'undefined' ? process.env.VITE_ADMIN_USERNAME : undefined;
+  const adminPassFromEnv = typeof process !== 'undefined' ? process.env.VITE_ADMIN_PASSWORD : undefined;
+
+  const isProductionSetupMissing = !adminUserFromEnv || !adminPassFromEnv;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
     // Use environment variables for credentials, with fallbacks for local development
-    const adminUser = process.env.VITE_ADMIN_USERNAME || 'admin';
-    const adminPass = process.env.VITE_ADMIN_PASSWORD || 'password';
+    const adminUser = adminUserFromEnv || 'admin';
+    const adminPass = adminPassFromEnv || 'password';
 
     if (username === adminUser && password === adminPass) {
       setError('');
@@ -52,7 +56,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                                 <li>Go to your project's <strong>Settings &gt; Environment Variables</strong>.</li>
                                 <li>Add a variable named <code className="bg-amber-100 text-amber-900 px-1 rounded-sm text-xs">VITE_ADMIN_USERNAME</code> with your desired username.</li>
                                 <li>Add another named <code className="bg-amber-100 text-amber-900 px-1 rounded-sm text-xs">VITE_ADMIN_PASSWORD</code> with a strong password.</li>
-                                <li>Redeploy your project for the changes to take effect.</li>
+                                <li><strong>Redeploy</strong> your project for the changes to take effect.</li>
                             </ul>
                         </div>
                     </div>
