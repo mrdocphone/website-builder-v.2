@@ -15,7 +15,7 @@ interface StylePanelProps {
   onAddSection: () => void;
   onLogout: () => void;
   session: Session;
-  navigate: (path: string) => void;
+  onOpenPublishModal: () => void;
 }
 
 const StyleEditor: React.FC<{ node: WebsiteNode, onNodeChange: (id: string, updates: Partial<WebsiteNode>) => void }> = ({ node, onNodeChange }) => {
@@ -69,8 +69,7 @@ const StyleEditor: React.FC<{ node: WebsiteNode, onNodeChange: (id: string, upda
                     </div>
                 </div>
             </div>
-          </div>
-        )}
+          )}
 
         {/* Background Controls */}
         {(node.type === 'section' || node.type === 'column' || node.type === 'row') && (
@@ -85,7 +84,7 @@ const StyleEditor: React.FC<{ node: WebsiteNode, onNodeChange: (id: string, upda
 };
 
 
-const StylePanel: React.FC<StylePanelProps> = ({ selectedNode, websiteData, onNodeChange, onAddSection, onLogout, session, navigate }) => {
+const StylePanelComponent: React.FC<StylePanelProps> = ({ selectedNode, websiteData, onNodeChange, onAddSection, onLogout, session, onOpenPublishModal }) => {
   const handleGlobalDataChange = (updates: Partial<WebsiteData>) => {
       // This is a bit of a hack since onNodeChange expects an ID. We pass a special ID to signify global changes.
       onNodeChange('root', updates as any);
@@ -106,7 +105,7 @@ const StylePanel: React.FC<StylePanelProps> = ({ selectedNode, websiteData, onNo
         </div>
         <div className="flex space-x-2">
             <button
-              onClick={() => { /* Implement publish */ }}
+              onClick={onOpenPublishModal}
               className="flex-1 inline-flex items-center justify-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 disabled:bg-indigo-400"
             >
               <LinkIcon className="w-4 h-4 mr-2" /> Publish
@@ -129,4 +128,5 @@ const StylePanel: React.FC<StylePanelProps> = ({ selectedNode, websiteData, onNo
   );
 };
 
-export default React.memo(StylePanel);
+// FIX: Changed to a named export to fix compilation errors.
+export const StylePanel = React.memo(StylePanelComponent);
