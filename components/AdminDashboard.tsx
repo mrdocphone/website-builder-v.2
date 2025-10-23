@@ -11,7 +11,6 @@ const AdminDashboardLayout: React.FC<AdminDashboardLayoutProps> = ({ onLogout, c
   
   const navItems = [
     { to: '/admin', text: 'Dashboard', icon: HomeIcon },
-    { to: '/editor', text: 'Website Editor', icon: PencilIcon },
     { to: '/admin/users', text: 'User Management', icon: UsersIcon },
   ];
 

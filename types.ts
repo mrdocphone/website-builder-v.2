@@ -1,3 +1,4 @@
+
 export type Theme = 'light' | 'dark' | 'ocean' | 'forest';
 
 // STYLING TYPES
@@ -81,4 +82,11 @@ export interface ThemeConfig {
   footerBg: string;
   footerText: string;
   headerText: string;
+}
+
+// FIX: Moved from App.tsx to break circular dependency.
+export interface Session {
+    isAuthenticated: boolean;
+    type: 'admin' | 'user' | null;
+    username: string | null;
 }

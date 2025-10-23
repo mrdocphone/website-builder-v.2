@@ -30,106 +30,8 @@ const PublishedWebsite: React.FC = () => {
 
             const parsedData = await response.json();
             
-            // Backwards compatibility check for old data structure
-            if (parsedData.sections && !parsedData.children) {
-              parsedData.children = parsedData.sections.map((s: any) => {
-                  let titleElement: Element | null = null;
-                  if (s.content?.title) {
-                      titleElement = { id: uuidv4(), type: 'headline', styles: { textAlign: 'center', paddingBottom: '20px' }, content: { text: s.content.title, level: 'h2' }};
-                  }
-          
-                  const sectionContentRow: Row = {
-                      id: uuidv4(),
-                      type: 'row' as const,
-                      styles: {},
-                      children: [] // This will be populated based on section type
-                  };
-          
-                  switch(s.type) {
-                      case 'about':
-                      case 'testimonials': // treat testimonials as single column too
-                          const elements: Element[] = [];
-                          if (s.type === 'about' && s.content?.body) {
-                              elements.push({ id: uuidv4(), type: 'text', styles: {}, content: { text: s.content.body }});
-                          }
-                          if (s.type === 'testimonials' && Array.isArray(s.content?.testimonials)) {
-                              s.content.testimonials.forEach((testimonial: any) => {
-                                  // Add guard to prevent crash on malformed testimonial data
-                                  if (testimonial && typeof testimonial === 'object' && testimonial.quote && testimonial.author) {
-                                      elements.push({ id: uuidv4(), type: 'text', styles: { fontStyle: 'italic', textAlign: 'center', paddingBottom: '5px' }, content: { text: `"${testimonial.quote}"` }});
-                                      elements.push({ id: uuidv4(), type: 'text', styles: { textAlign: 'center', paddingBottom: '20px' }, content: { text: `- ${testimonial.author}` }});
-                                  }
-                              });
-                          }
-                          sectionContentRow.children = [{
-                              id: uuidv4(),
-                              type: 'column' as const,
-                              styles: {},
-                              children: elements
-                          }];
-                          break;
-                      case 'services':
-                          if (Array.isArray(s.content?.services)) {
-                              // Add filter to prevent crash on malformed service data
-                              sectionContentRow.children = s.content.services
-                                .filter((service: any) => service && typeof service === 'object' && service.name && service.description)
-                                .map((service: any): Column => ({
-                                  id: uuidv4(),
-                                  type: 'column' as const,
-                                  styles: { paddingLeft: '10px', paddingRight: '10px'},
-                                  children: [
-                                      { id: uuidv4(), type: 'headline', styles: { textAlign: 'center', paddingTop: '10px' }, content: { text: service.name, level: 'h3' }},
-                                      { id: uuidv4(), type: 'text', styles: { textAlign: 'center', paddingBottom: '20px' }, content: { text: service.description }}
-                                  ]
-                              }));
-                          }
-                          break;
-                      case 'gallery':
-                          if (Array.isArray(s.content?.images)) {
-                              // Add filter to prevent crash on malformed image data
-                              sectionContentRow.children = s.content.images
-                                .filter((image: any) => image && typeof image === 'object' && image.url && image.alt)
-                                .map((image: any): Column => ({
-                                  id: uuidv4(),
-                                  type: 'column' as const,
-                                  styles: { paddingLeft: '10px', paddingRight: '10px' },
-                                  children: [
-                                      { id: uuidv4(), type: 'image', styles: { paddingTop: '10px', paddingBottom: '10px' }, content: { src: image.url, alt: image.alt }}
-                                  ]
-                              }));
-                          }
-                          break;
-                  }
-          
-                  const sectionRows: Row[] = [];
-                  if (titleElement) {
-                      sectionRows.push({
-                          id: uuidv4(),
-                          type: 'row' as const,
-                          styles: {},
-                          children: [{
-                              id: uuidv4(),
-                              type: 'column' as const,
-                              styles: {},
-                              children: [titleElement]
-                          }]
-                      });
-                  }
-                  if (sectionContentRow.children.length > 0) {
-                      sectionRows.push(sectionContentRow);
-                  }
-          
-                  return {
-                      id: s.id || uuidv4(),
-                      type: 'section' as const,
-                      styles: { paddingTop: '40px', paddingBottom: '40px' },
-                      children: sectionRows
-                  };
-              });
-              delete parsedData.sections;
-            }
-
-
+            // Removed the complex backwards compatibility logic to improve stability.
+            // Published sites will now only render using the modern, stable data format.
             if (parsedData.businessName && Array.isArray(parsedData.children)) {
                 setWebsiteData(parsedData);
                 document.title = parsedData.businessName;
@@ -176,7 +78,7 @@ const PublishedWebsite: React.FC = () => {
 
   return (
     <div className="w-screen h-screen">
-      <Preview websiteData={websiteData} isEditor={false} />
+      <Preview websiteData={websiteData} />
     </div>
   );
 };
