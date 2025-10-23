@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import type { WebsiteData } from '../types';
+import type { WebsiteData, Element, Row, Column } from '../types';
 import Preview from './Preview';
+import { v4 as uuidv4 } from 'uuid';
+
 
 const PublishedWebsite: React.FC = () => {
   const { username, slug } = useParams<{ username: string; slug?: string }>();
@@ -10,7 +12,6 @@ const PublishedWebsite: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Combine username and slug for the API request. Handles cases where slug is undefined.
     const slugToFetch = slug ? `${username}/${slug}` : username;
 
     const fetchWebsiteData = async () => {
@@ -29,11 +30,102 @@ const PublishedWebsite: React.FC = () => {
 
             const parsedData = await response.json();
             
-            if (parsedData.businessName && Array.isArray(parsedData.sections)) {
+            // Backwards compatibility check for old data structure
+            if (parsedData.sections && !parsedData.children) {
+              parsedData.children = parsedData.sections.map((s: any) => {
+                  let titleElement: Element | null = null;
+                  if (s.content?.title) {
+                      titleElement = { id: uuidv4(), type: 'headline', styles: { textAlign: 'center', paddingBottom: '20px' }, content: { text: s.content.title, level: 'h2' }};
+                  }
+          
+                  const sectionContentRow: Row = {
+                      id: uuidv4(),
+                      type: 'row' as const,
+                      styles: {},
+                      children: [] // This will be populated based on section type
+                  };
+          
+                  switch(s.type) {
+                      case 'about':
+                      case 'testimonials': // treat testimonials as single column too
+                          const elements: Element[] = [];
+                          if (s.type === 'about' && s.content?.body) {
+                              elements.push({ id: uuidv4(), type: 'text', styles: {}, content: { text: s.content.body }});
+                          }
+                          if (s.type === 'testimonials' && Array.isArray(s.content?.testimonials)) {
+                              s.content.testimonials.forEach((testimonial: any) => {
+                                  elements.push({ id: uuidv4(), type: 'text', styles: { fontStyle: 'italic', textAlign: 'center', paddingBottom: '5px' }, content: { text: `"${testimonial.quote}"` }});
+                                  elements.push({ id: uuidv4(), type: 'text', styles: { textAlign: 'center', paddingBottom: '20px' }, content: { text: `- ${testimonial.author}` }});
+                              });
+                          }
+                          sectionContentRow.children = [{
+                              id: uuidv4(),
+                              type: 'column' as const,
+                              styles: {},
+                              children: elements
+                          }];
+                          break;
+                      case 'services':
+                          if (Array.isArray(s.content?.services)) {
+                              sectionContentRow.children = s.content.services.map((service: any): Column => ({
+                                  id: uuidv4(),
+                                  type: 'column' as const,
+                                  styles: { paddingLeft: '10px', paddingRight: '10px'},
+                                  children: [
+                                      { id: uuidv4(), type: 'headline', styles: { textAlign: 'center', paddingTop: '10px' }, content: { text: service.name, level: 'h3' }},
+                                      { id: uuidv4(), type: 'text', styles: { textAlign: 'center', paddingBottom: '20px' }, content: { text: service.description }}
+                                  ]
+                              }));
+                          }
+                          break;
+                      case 'gallery':
+                          if (Array.isArray(s.content?.images)) {
+                              sectionContentRow.children = s.content.images.map((image: any): Column => ({
+                                  id: uuidv4(),
+                                  type: 'column' as const,
+                                  styles: { paddingLeft: '10px', paddingRight: '10px' },
+                                  children: [
+                                      { id: uuidv4(), type: 'image', styles: { paddingTop: '10px', paddingBottom: '10px' }, content: { src: image.url, alt: image.alt }}
+                                  ]
+                              }));
+                          }
+                          break;
+                  }
+          
+                  const sectionRows: Row[] = [];
+                  if (titleElement) {
+                      sectionRows.push({
+                          id: uuidv4(),
+                          type: 'row' as const,
+                          styles: {},
+                          children: [{
+                              id: uuidv4(),
+                              type: 'column' as const,
+                              styles: {},
+                              children: [titleElement]
+                          }]
+                      });
+                  }
+                  if (sectionContentRow.children.length > 0) {
+                      sectionRows.push(sectionContentRow);
+                  }
+          
+                  return {
+                      id: s.id || uuidv4(),
+                      type: 'section' as const,
+                      styles: { paddingTop: '40px', paddingBottom: '40px' },
+                      children: sectionRows
+                  };
+              });
+              delete parsedData.sections;
+            }
+
+
+            if (parsedData.businessName && Array.isArray(parsedData.children)) {
                 setWebsiteData(parsedData);
                 document.title = parsedData.businessName;
             } else {
-                throw new Error("The website data appears to be corrupted.");
+                throw new Error("The website data appears to be corrupted or in an old format.");
             }
         } catch (e) {
             setError(e instanceof Error ? e.message : "An unknown error occurred.");
@@ -75,7 +167,7 @@ const PublishedWebsite: React.FC = () => {
 
   return (
     <div className="w-screen h-screen">
-      <Preview websiteData={websiteData} />
+      <Preview websiteData={websiteData} isEditor={false} />
     </div>
   );
 };

@@ -42,51 +42,123 @@
       }
     </script>
     <style>
-      .preview-section-wrapper {
+      /* Base Editor Styles */
+      .editor-container {
+        display: flex;
+        height: 100vh;
+        font-family: sans-serif;
+      }
+      .editor-sidebar {
+        width: 350px;
+        background-color: #ffffff;
+        border-right: 1px solid #e2e8f0;
+        overflow-y: auto;
+        flex-shrink: 0;
+      }
+      .editor-preview {
+        flex-grow: 1;
+        background-color: #f1f5f9;
+        padding: 2rem;
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+        overflow: auto;
+      }
+      .preview-canvas {
+         width: 100%;
+         background-color: white;
+         box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+         border-radius: 0.5rem;
+         overflow: hidden;
+         transform: scale(0.95);
+         transform-origin: top center;
+      }
+
+      /* Interactive Wrapper Styles */
+      .interactive-wrapper {
         position: relative;
-        cursor: pointer;
+        transition: box-shadow 0.2s ease-in-out;
       }
-      .preview-section-wrapper .edit-overlay {
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background-color: rgba(99, 102, 241, 0.1);
-        border: 2px solid #4f46e5;
-        opacity: 0;
-        transition: opacity 0.2s ease-in-out;
-        z-index: 10;
-        pointer-events: none; /* Allows clicks to go through if needed, though we capture on wrapper */
-      }
-      .preview-section-wrapper.selected .edit-overlay,
-      .preview-section-wrapper:hover .edit-overlay {
+      .interactive-wrapper:hover > .element-toolbar {
         opacity: 1;
+        visibility: visible;
       }
-      .preview-section-wrapper .edit-badge {
+      .interactive-wrapper.selected {
+        box-shadow: 0 0 0 2px #4f46e5;
+        z-index: 10;
+      }
+      .interactive-wrapper.hovered {
+         box-shadow: 0 0 0 2px #a5b4fc;
+      }
+      
+      /* Element Toolbar */
+      .element-toolbar {
         position: absolute;
-        top: 1rem;
-        right: 1rem;
+        top: -28px;
+        left: 0px;
         background-color: #4f46e5;
         color: white;
-        padding: 0.25rem 0.75rem;
-        border-radius: 9999px;
-        font-size: 0.875rem;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 12px;
         font-weight: 500;
-        z-index: 11;
+        z-index: 20;
+        display: flex;
+        align-items: center;
+        gap: 4px;
         opacity: 0;
-        transition: opacity 0.2s ease-in-out;
-      }
-      .preview-section-wrapper.selected .edit-badge,
-      .preview-section-wrapper:hover .edit-badge {
-        opacity: 1;
-      }
-      .dragging-placeholder {
-        background-color: #eef2ff;
-        border: 2px dashed #a5b4fc;
-      }
-      .dragging-placeholder > * {
         visibility: hidden;
+        transition: opacity 0.2s, visibility 0.2s;
+      }
+       .element-toolbar button {
+        background: transparent;
+        border: none;
+        color: white;
+        cursor: pointer;
+        padding: 2px;
+        border-radius: 3px;
+       }
+       .element-toolbar button:hover {
+        background-color: rgba(255, 255, 255, 0.2);
+       }
+
+      /* Add Element button inside empty columns */
+      .empty-column-placeholder {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100px;
+        border: 2px dashed #cbd5e1;
+        border-radius: 0.375rem;
+        padding: 1rem;
+      }
+      
+      /* Style Panel Accordion */
+      .style-accordion-header {
+        background-color: #f8fafc;
+        border: 1px solid #e2e8f0;
+        padding: 0.75rem;
+        width: 100%;
+        text-align: left;
+        font-weight: 600;
+        color: #334155;
+        cursor: pointer;
+      }
+       .style-accordion-content {
+        padding: 1rem;
+        border: 1px solid #e2e8f0;
+        border-top: none;
+       }
+
+      /* Disabling pointer events on preview iframe during drag for smoother experience */
+      body.dragging-active iframe {
+        pointer-events: none;
+      }
+
+      /* Hide resize handles on non-contentEditable elements */
+      [contenteditable="false"]::-webkit-resizer,
+      [contenteditable="false"]::resize {
+        display: none;
       }
     </style>
   <script type="importmap">
@@ -98,7 +170,9 @@
     "@google/genai": "https://aistudiocdn.com/@google/genai@^1.26.0",
     "react-router-dom": "https://aistudiocdn.com/react-router-dom@^7.9.4",
     "uuid": "https://aistudiocdn.com/uuid@^13.0.0",
-    "@vercel/kv": "https://aistudiocdn.com/@vercel/kv@^3.0.0"
+    "@vercel/kv": "https://aistudiocdn.com/@vercel/kv@^3.0.0",
+    "immer": "https://aistudiocdn.com/immer@^10.1.1",
+    "use-immer": "https://aistudiocdn.com/use-immer@^1.0.1"
   }
 }
 </script>

@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import type { WebsiteData, Section, AboutSectionContent, ServicesSectionContent, GallerySectionContent, TestimonialsSectionContent } from '../types';
+import type { WebsiteData, Section } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 
 // This is a Vercel Serverless Function that securely calls the Gemini API.
@@ -11,7 +11,7 @@ export const config = {
 
 // --- Helper functions moved from the original geminiService ---
 
-const generatePrompt = (websiteData: WebsiteData, section: Section): string => {
+const generatePrompt = (websiteData: WebsiteData, section: any): string => {
   const baseIntro = `You are a professional copywriter for a small business website builder.
 Your task is to generate content for a specific section of a website.
 The tone should be professional, warm, and trustworthy.
@@ -54,7 +54,8 @@ Task: Suggest a short, single paragraph of content for a section titled "${(sect
   }
 };
 
-const getResponseSchema = (sectionType: Section['type']) => {
+// FIX: Changed sectionType from Section['type'] to string to allow for legacy section types.
+const getResponseSchema = (sectionType: string) => {
     switch (sectionType) {
         case 'services':
             return {

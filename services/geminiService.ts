@@ -1,4 +1,4 @@
-import type { WebsiteData, Section, AboutSectionContent, ServicesSectionContent, GallerySectionContent, TestimonialsSectionContent } from '../types';
+import type { WebsiteData } from '../types';
 
 /**
  * This function now calls our own secure API endpoint on the server,
@@ -6,8 +6,8 @@ import type { WebsiteData, Section, AboutSectionContent, ServicesSectionContent,
  */
 export const generateSectionContent = async (
   websiteData: WebsiteData,
-  section: Section
-): Promise<Partial<AboutSectionContent | ServicesSectionContent | GallerySectionContent | TestimonialsSectionContent>> => {
+  section: any // The 'section' object here uses a legacy structure, not the new 'Section' type from ../types.
+): Promise<any> => { // The return type from the AI API is dynamic, so 'any' is appropriate here.
   
   try {
     const response = await fetch('/api/generate', {

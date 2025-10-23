@@ -1,175 +1,92 @@
-import React, { useState, useEffect } from 'react';
-import type { Section } from '../types';
-import { v4 as uuidv4 } from 'uuid';
-import { MagicWandIcon, TrashIcon } from './icons';
+import React, { useRef, useEffect } from 'react';
+import type { Element as ElementType, HeadlineElement, TextElement, ImageElement, ButtonElement } from '../types';
 
-interface SectionEditorFormProps {
-    section: Section;
-    onContentChange: (sectionId: string, newContent: any) => void;
-    onGenerate: (section: Section) => void;
-    isGenerating: boolean;
+interface ElementProps {
+  element: ElementType;
+  isEditor: boolean;
+  onContentChange: (newContent: any) => void;
 }
 
-const SectionEditorForm: React.FC<SectionEditorFormProps> = ({ section, onContentChange, onGenerate, isGenerating }) => {
-    const [localContent, setLocalContent] = useState(section.content);
+const Element: React.FC<ElementProps> = ({ element, isEditor, onContentChange }) => {
+  const contentRef = useRef<HTMLElement>(null);
+  
+  // For inline text editing
+  const handleBlur = () => {
+    if (!contentRef.current) return;
+    const newText = contentRef.current.innerText;
+    if (newText !== (element.content as any).text) {
+      onContentChange({ ...element.content, text: newText });
+    }
+  };
+  
+  // Enable content editable only in editor mode and for text-based elements
+  const isEditable = isEditor && (element.type === 'headline' || element.type === 'text' || element.type === 'button');
 
-    // Sync local state if the parent prop changes (e.g., from AI generation or loading)
-    useEffect(() => {
-        setLocalContent(section.content);
-    }, [section.content]);
+  useEffect(() => {
+    // Sync innerText if external data changes, to prevent stale content
+    if (contentRef.current && (element.type === 'headline' || element.type === 'text' || element.type === 'button')) {
+      if (contentRef.current.innerText !== element.content.text) {
+          contentRef.current.innerText = element.content.text;
+      }
+    }
+  }, [element.content.text]);
 
-    // Debounce updates to the parent component
-    useEffect(() => {
-        // A simple string comparison to check for changes before setting a timer.
-        if (JSON.stringify(localContent) === JSON.stringify(section.content)) {
-            return;
-        }
 
-        const handler = setTimeout(() => {
-            onContentChange(section.id, localContent);
-        }, 400);
+  switch (element.type) {
+    case 'headline':
+      const { level, text } = element.content as HeadlineElement['content'];
+      const Tag = level;
+      return (
+        <Tag
+          ref={contentRef as any}
+          contentEditable={isEditable}
+          suppressContentEditableWarning={true}
+          onBlur={handleBlur}
+          className="outline-none"
+        >
+          {text}
+        </Tag>
+      );
 
-        return () => {
-            clearTimeout(handler);
-        };
-    }, [localContent, onContentChange, section.id, section.content]);
+    case 'text':
+      return (
+        <p
+          ref={contentRef}
+          contentEditable={isEditable}
+          suppressContentEditableWarning={true}
+          onBlur={handleBlur}
+          className="outline-none whitespace-pre-wrap"
+        >
+          {(element.content as TextElement['content']).text}
+        </p>
+      );
 
-    const baseInput = "w-full p-2 border border-slate-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-sm";
-    const baseLabel = "text-sm font-medium text-slate-600 block mb-1";
+    case 'image':
+      const { src, alt } = element.content as ImageElement['content'];
+      return <img src={src} alt={alt} className="max-w-full h-auto" />;
 
-    // --- Local State Handlers ---
-    // All handlers now update the fast, local state (`localContent`) instead of the slow parent state.
+    case 'button':
+      return (
+        <a 
+          href={(element.content as ButtonElement['content']).href} 
+          onClick={(e) => isEditor && e.preventDefault()}
+          className="inline-block bg-indigo-600 text-white px-6 py-3 rounded-md no-underline"
+        >
+          <span
+            ref={contentRef as any}
+            contentEditable={isEditable}
+            suppressContentEditableWarning={true}
+            onBlur={handleBlur}
+            className="outline-none"
+          >
+            {(element.content as ButtonElement['content']).text}
+          </span>
+        </a>
+      );
+      
+    default:
+      return null;
+  }
+};
 
-    const handleFieldChange = (field: string, value: any) => {
-        setLocalContent(prev => ({ ...prev, [field]: value }));
-    };
-
-    const handleItemChange = (itemId: string, field: string, value: string) => {
-        const key = section.type === 'services' ? 'services' : section.type === 'gallery' ? 'images' : 'testimonials';
-        const items = (localContent as any)[key];
-        const updatedItems = items.map((item: any) => item.id === itemId ? { ...item, [field]: value } : item);
-        setLocalContent(prev => ({ ...prev, [key]: updatedItems }));
-    };
-
-    const handleAddItem = () => {
-        let newItem;
-        let key;
-        switch (section.type) {
-            case 'services':
-                newItem = { id: uuidv4(), name: 'New Service', description: 'Describe this service.' };
-                key = 'services';
-                break;
-            case 'gallery':
-                newItem = { id: uuidv4(), url: `https://picsum.photos/400/300?random=${Math.floor(Math.random() * 100)}`, alt: 'New image' };
-                key = 'images';
-                break;
-            case 'testimonials':
-                newItem = { id: uuidv4(), quote: 'A new glowing review!', author: 'New Customer' };
-                key = 'testimonials';
-                break;
-            default: return;
-        }
-        setLocalContent(prev => ({ ...prev, [key]: [...(prev as any)[key], newItem] }));
-    };
-
-    const handleRemoveItem = (itemId: string) => {
-        const key = section.type === 'services' ? 'services' : section.type === 'gallery' ? 'images' : 'testimonials';
-        const updatedItems = (localContent as any)[key].filter((item: any) => item.id !== itemId);
-        setLocalContent(prev => ({ ...prev, [key]: updatedItems }));
-    };
-    
-    // Use the local `content` for rendering the form fields' values
-    const content = localContent as any;
-
-    return (
-        <div className="p-4 border-t border-slate-200 mt-3 bg-slate-50">
-            <div className="flex justify-between items-center mb-4">
-                <h3 className="font-semibold text-slate-700 text-base">Editing: <span className="capitalize">{section.type}</span></h3>
-                <button onClick={() => onGenerate(section)} disabled={isGenerating} className="flex items-center text-sm text-indigo-600 hover:text-indigo-800 font-medium disabled:opacity-50 disabled:cursor-wait">
-                    <MagicWandIcon className="w-4 h-4 mr-1" />
-                    {isGenerating ? 'Generating...' : 'Generate with AI'}
-                </button>
-            </div>
-
-            <div className="space-y-4">
-                {'title' in content && (
-                    <div>
-                        <label className={baseLabel}>Section Title</label>
-                        <input type="text" value={content.title} onChange={e => handleFieldChange('title', e.target.value)} className={baseInput} />
-                    </div>
-                )}
-
-                {section.type === 'about' && (
-                    <div>
-                        <label className={baseLabel}>Body</label>
-                        <textarea value={content.body} onChange={e => handleFieldChange('body', e.target.value)} rows={6} className={baseInput} />
-                    </div>
-                )}
-
-                {section.type === 'services' && content.services.map((service: any) => (
-                    <div key={service.id} className="p-3 border border-slate-200 rounded-md bg-white relative">
-                        <button onClick={() => handleRemoveItem(service.id)} className="absolute top-2 right-2 text-red-400 hover:text-red-600"><TrashIcon className="w-4 h-4" /></button>
-                        <div className="space-y-2">
-                            <div>
-                                <label className={baseLabel}>Service Name</label>
-                                <input type="text" value={service.name} onChange={e => handleItemChange(service.id, 'name', e.target.value)} className={baseInput} />
-                            </div>
-                            <div>
-                                <label className={baseLabel}>Description</label>
-                                <textarea value={service.description} onChange={e => handleItemChange(service.id, 'description', e.target.value)} rows={2} className={baseInput} />
-                            </div>
-                        </div>
-                    </div>
-                ))}
-
-                {section.type === 'gallery' && content.images.map((image: any) => (
-                    <div key={image.id} className="p-3 border border-slate-200 rounded-md bg-white relative">
-                        <button onClick={() => handleRemoveItem(image.id)} className="absolute top-2 right-2 text-red-400 hover:text-red-600"><TrashIcon className="w-4 h-4" /></button>
-                        <div className="space-y-2">
-                            <div>
-                                <label className={baseLabel}>Image URL</label>
-                                <input type="text" value={image.url} onChange={e => handleItemChange(image.id, 'url', e.target.value)} className={baseInput} />
-                            </div>
-                            <div>
-                                <label className={baseLabel}>Alt Text (for accessibility)</label>
-                                <input type="text" value={image.alt} onChange={e => handleItemChange(image.id, 'alt', e.target.value)} className={baseInput} />
-                            </div>
-                        </div>
-                    </div>
-                ))}
-
-                {section.type === 'testimonials' && content.testimonials.map((testimonial: any) => (
-                    <div key={testimonial.id} className="p-3 border border-slate-200 rounded-md bg-white relative">
-                        <button onClick={() => handleRemoveItem(testimonial.id)} className="absolute top-2 right-2 text-red-400 hover:text-red-600"><TrashIcon className="w-4 h-4" /></button>
-                        <div className="space-y-2">
-                            <div>
-                                <label className={baseLabel}>Quote</label>
-                                <textarea value={testimonial.quote} onChange={e => handleItemChange(testimonial.id, 'quote', e.target.value)} rows={3} className={baseInput} />
-                            </div>
-                            <div>
-                                <label className={baseLabel}>Author</label>
-                                <input type="text" value={testimonial.author} onChange={e => handleItemChange(testimonial.id, 'author', e.target.value)} className={baseInput} />
-                            </div>
-                        </div>
-                    </div>
-                ))}
-
-                {(section.type === 'services' || section.type === 'gallery' || section.type === 'testimonials') && (
-                    <button onClick={handleAddItem} className="w-full text-sm text-indigo-600 border-2 border-dashed border-slate-300 rounded-md py-2 hover:bg-indigo-50 hover:border-indigo-500">
-                        + Add {section.type === 'services' ? 'Service' : section.type === 'gallery' ? 'Image' : 'Testimonial'}
-                    </button>
-                )}
-
-                {section.type === 'contact' && (
-                    <div className="space-y-2">
-                        <div><label className={baseLabel}>Address</label><input type="text" value={content.address} onChange={e => handleFieldChange('address', e.target.value)} className={baseInput} /></div>
-                        <div><label className={baseLabel}>Phone</label><input type="text" value={content.phone} onChange={e => handleFieldChange('phone', e.target.value)} className={baseInput} /></div>
-                        <div><label className={baseLabel}>Email</label><input type="email" value={content.email} onChange={e => handleFieldChange('email', e.target.value)} className={baseInput} /></div>
-                    </div>
-                )}
-            </div>
-        </div>
-    )
-}
-
-export default React.memo(SectionEditorForm);
+export default React.memo(Element);

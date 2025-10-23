@@ -1,36 +1,75 @@
 export type Theme = 'light' | 'dark' | 'ocean' | 'forest';
 
-// Base Section Structure
-interface SectionBase<T extends string, C> {
-  id: string;
-  type: T;
-  content: C;
+// STYLING TYPES
+export interface Styles {
+  // Spacing
+  paddingTop?: string;
+  paddingBottom?: string;
+  paddingLeft?: string;
+  paddingRight?: string;
+  marginTop?: string;
+  marginBottom?: string;
+  // Typography
+  color?: string;
+  fontSize?: string;
+  textAlign?: 'left' | 'center' | 'right' | 'justify';
+  fontWeight?: 'normal' | 'bold';
+  // FIX: Add fontStyle property to fix type error on App.tsx line 88.
+  fontStyle?: 'normal' | 'italic' | 'oblique';
+  // Background
+  backgroundColor?: string;
+  // Border
+  borderRadius?: string;
+  // etc.
 }
 
-// Section-specific Content Types
-export type AboutSectionContent = { title: string; body: string; };
-export type ServicesSectionContent = { title: string; services: { id: string; name: string; description: string; }[]; };
-export type GallerySectionContent = { title: string; images: { id: string; url: string; alt: string; }[]; };
-export type TestimonialsSectionContent = { title: string; testimonials: { id: string; quote: string; author: string; }[]; };
-export type ContactSectionContent = { title: string; address: string; phone: string; email: string; };
+// BASE STRUCTURE for all editable items
+interface StructureNode<T extends string> {
+  id: string;
+  type: T;
+  styles: Styles;
+}
 
-// Discriminated Union for all Section types
-export type Section =
-  | SectionBase<'about', AboutSectionContent>
-  | SectionBase<'services', ServicesSectionContent>
-  | SectionBase<'gallery', GallerySectionContent>
-  | SectionBase<'testimonials', TestimonialsSectionContent>
-  | SectionBase<'contact', ContactSectionContent>;
+// CONTENT ELEMENT TYPES
+export type ElementType = 'headline' | 'text' | 'image' | 'button';
 
-export type SectionType = Section['type'];
+export interface HeadlineElement extends StructureNode<'headline'> {
+  content: { text: string; level: 'h1' | 'h2' | 'h3' };
+}
+export interface TextElement extends StructureNode<'text'> {
+  content: { text: string };
+}
+export interface ImageElement extends StructureNode<'image'> {
+  content: { src: string; alt: string };
+}
+export interface ButtonElement extends StructureNode<'button'> {
+  content: { text: string; href: string };
+}
 
+export type Element = HeadlineElement | TextElement | ImageElement | ButtonElement;
+
+// LAYOUT STRUCTURE TYPES
+export interface Column extends StructureNode<'column'> {
+  children: Element[];
+}
+export interface Row extends StructureNode<'row'> {
+  children: Column[];
+}
+export interface Section extends StructureNode<'section'> {
+  children: Row[];
+}
+
+// Combined type for any node in the structure tree
+export type WebsiteNode = Section | Row | Column | Element;
+
+// TOP-LEVEL WEBSITE DATA
 export interface WebsiteData {
   businessName: string;
   tagline: string;
   slug: string;
-  heroImageUrl: string;
   theme: Theme;
-  sections: Section[];
+  heroImageUrl: string; // Kept for simplicity of the top hero
+  children: Section[]; // The main page content
 }
 
 export interface ThemeConfig {
