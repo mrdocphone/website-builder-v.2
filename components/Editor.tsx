@@ -93,6 +93,7 @@ const Editor: React.FC<EditorProps> = ({ websiteData, setWebsiteData, onLogout }
   const [publishedUrl, setPublishedUrl] = useState('');
   const [showAddSectionModal, setShowAddSectionModal] = useState(false);
   const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
+  const [isPublishing, setIsPublishing] = useState(false);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -119,12 +120,19 @@ const Editor: React.FC<EditorProps> = ({ websiteData, setWebsiteData, onLogout }
     }
   };
 
-  const handlePublish = () => {
+  const handlePublish = async () => {
+    setIsPublishing(true);
+    setError(null);
     try {
       const slugify = (text: string) => (text || '').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
       const slug = websiteData.slug && websiteData.slug.trim() !== '' 
         ? websiteData.slug 
         : slugify(websiteData.businessName);
+
+      const RESERVED_SLUGS = ['editor', 'site', 'api', 'login', 'index.html', 'favicon.ico'];
+      if (RESERVED_SLUGS.includes(slug)) {
+          throw new Error(`The slug "${slug}" is reserved. Please choose another.`);
+      }
 
       // Update state in case we had to generate a slug from an empty field
       if (slug !== websiteData.slug) {
@@ -132,16 +140,28 @@ const Editor: React.FC<EditorProps> = ({ websiteData, setWebsiteData, onLogout }
       }
 
       const dataToPublish = { ...websiteData, slug };
-      const jsonString = JSON.stringify(dataToPublish);
-      const base64String = window.btoa(encodeURIComponent(jsonString));
-      const url = `${window.location.origin}/site/${slug}--${base64String}`;
+      
+      const response = await fetch('/api/publish', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(dataToPublish)
+      });
+      
+      if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.message || "Failed to publish on the server.");
+      }
+      
+      const url = `${window.location.origin}/${slug}`;
       
       setPublishedUrl(url);
       window.open(url, '_blank', 'noopener,noreferrer');
       setShowPublishModal(true);
     } catch(e) {
       console.error("Failed to publish", e);
-      setError("Could not generate the shareable link. The website data might be too large.")
+      setError(e instanceof Error ? e.message : "Could not publish your website.")
+    } finally {
+        setIsPublishing(false);
     }
   };
 
@@ -350,10 +370,11 @@ const renderSectionForm = (section: Section) => {
           <div className="flex items-center space-x-2">
             <button
               onClick={handlePublish}
-              className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
+              disabled={isPublishing}
+              className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors disabled:bg-indigo-400 disabled:cursor-wait"
             >
               <LinkIcon className="w-4 h-4 mr-2" />
-              Publish & Share
+              {isPublishing ? 'Publishing...' : 'Publish & Share'}
             </button>
             <button 
               onClick={onLogout}
@@ -415,8 +436,8 @@ const renderSectionForm = (section: Section) => {
                        {editingSectionId === section.id && renderSectionForm(section)}
                    </div>
                 ))}
-                 {error && <p className="text-xs text-red-500 mt-2 p-1 bg-red-50 rounded-md">{error}</p>}
             </div>
+             {error && <p className="text-xs text-red-500 mt-2 p-2 bg-red-50 rounded-md border border-red-200">{error}</p>}
           </div>
           
           {/* Theme */}

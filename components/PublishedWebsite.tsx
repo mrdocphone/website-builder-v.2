@@ -4,38 +4,64 @@ import type { WebsiteData } from '../types';
 import Preview from './Preview';
 
 const PublishedWebsite: React.FC = () => {
-  const { slugAndData } = useParams<{ slugAndData: string }>();
+  const { slug } = useParams<{ slug: string }>();
   const [websiteData, setWebsiteData] = useState<WebsiteData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (slugAndData) {
-      try {
-        const parts = slugAndData.split('--');
-        const base64Data = parts.pop();
-
-        if (!base64Data) {
-          throw new Error("Invalid URL format: Missing data.");
-        }
-
-        const decodedString = decodeURIComponent(window.atob(base64Data));
-        const parsedData = JSON.parse(decodedString);
-        
-        // Updated validation for the new section-based data structure
-        if (parsedData.businessName && Array.isArray(parsedData.sections) && parsedData.theme) {
-          setWebsiteData(parsedData);
-          document.title = parsedData.businessName;
-        } else {
-            throw new Error("Invalid data structure.");
-        }
-      } catch (e) {
-        setError("Could not load website data. The link may be invalid or corrupted.");
-        console.error("Failed to decode website data from URL", e);
-      }
-    } else {
-      setError("No website data provided in the link.");
+    // App-specific routes should not be treated as slugs.
+    // The router configuration in App.tsx prevents this component from rendering for these paths,
+    // so this is just a defensive check.
+    if (!slug) {
+      setError("This page does not exist.");
+      setIsLoading(false);
+      return;
     }
-  }, [slugAndData]);
+
+    const fetchWebsiteData = async () => {
+        setIsLoading(true);
+        setError(null);
+        try {
+            const response = await fetch(`/api/site?slug=${slug}`);
+
+            if (response.status === 404) {
+                throw new Error("We couldn't find a website at this address. Please check the URL.");
+            }
+            if (!response.ok) {
+                throw new Error("An error occurred while loading the website.");
+            }
+
+            const parsedData = await response.json();
+            
+            if (parsedData.businessName && Array.isArray(parsedData.sections)) {
+                setWebsiteData(parsedData);
+                document.title = parsedData.businessName;
+            } else {
+                throw new Error("The website data appears to be corrupted.");
+            }
+        } catch (e) {
+            setError(e instanceof Error ? e.message : "An unknown error occurred.");
+            console.error("Failed to load website data", e);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    
+    fetchWebsiteData();
+
+  }, [slug]);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center w-screen h-screen bg-slate-100 font-sans">
+        <div className="text-center">
+            <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+            <p className="mt-4 text-slate-700 text-lg">Loading website...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (error) {
     return (
@@ -49,14 +75,8 @@ const PublishedWebsite: React.FC = () => {
   }
 
   if (!websiteData) {
-    return (
-      <div className="flex items-center justify-center w-screen h-screen bg-slate-100 font-sans">
-        <div className="text-center">
-            <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-            <p className="mt-4 text-slate-700 text-lg">Loading website...</p>
-        </div>
-      </div>
-    );
+    // This case is covered by error or loading, but acts as a fallback.
+    return null;
   }
 
   return (

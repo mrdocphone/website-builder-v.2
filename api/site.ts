@@ -1,0 +1,50 @@
+// Vercel Serverless Function
+// This function retrieves website data from Vercel KV by its slug.
+import { kv } from '@vercel/kv';
+
+export const config = {
+  runtime: 'edge',
+};
+
+export default async function handler(request: Request) {
+  if (request.method !== 'GET') {
+    return new Response(JSON.stringify({ message: 'Method Not Allowed' }), { 
+      status: 405, 
+      headers: { 'Content-Type': 'application/json' } 
+    });
+  }
+
+  try {
+    const { searchParams } = new URL(request.url);
+    const slug = searchParams.get('slug');
+
+    if (!slug) {
+        return new Response(JSON.stringify({ message: 'Slug is required.' }), { 
+            status: 400, 
+            headers: { 'Content-Type': 'application/json' } 
+        });
+    }
+
+    // Retrieve data string from Vercel KV
+    const dataString = await kv.get<string>(slug);
+
+    if (dataString) {
+        // Return the JSON string directly. The client will parse it.
+        return new Response(dataString, { 
+            status: 200, 
+            headers: { 'Content-Type': 'application/json' } 
+        });
+    } else {
+        return new Response(JSON.stringify({ message: 'Site not found.' }), { 
+            status: 404, 
+            headers: { 'Content-Type': 'application/json' } 
+        });
+    }
+  } catch (error) {
+    console.error('Error in /api/site:', error);
+    return new Response(JSON.stringify({ message: 'Failed to retrieve site data.' }), { 
+      status: 500, 
+      headers: { 'Content-Type': 'application/json' } 
+    });
+  }
+}

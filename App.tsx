@@ -161,8 +161,6 @@ const AppContent: React.FC = () => {
 
     return (
         <Routes>
-            <Route path="/site/:slugAndData" element={<PublishedWebsite />} />
-            
             <Route 
                 path="/editor" 
                 element={
@@ -188,6 +186,9 @@ const AppContent: React.FC = () => {
                     )
                 }
             />
+            
+            {/* IMPORTANT: This route must be last to act as a catch-all for slugs */}
+            <Route path="/:slug" element={<PublishedWebsite />} />
         </Routes>
     );
 };
