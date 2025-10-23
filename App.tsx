@@ -6,119 +6,6 @@ import Login from './components/Login';
 import type { WebsiteData, Section } from './types';
 import { v4 as uuidv4 } from 'uuid';
 
-
-// Data Migration function for backward compatibility
-const migrateToSectionBasedData = (oldData: any): WebsiteData => {
-  const slugify = (text: string) => (text || '').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-  const businessName = oldData.businessName || 'My Business';
-  const sections: Section[] = [
-    {
-      id: uuidv4(),
-      type: 'about',
-      content: {
-        title: 'About Us',
-        body: oldData.aboutUs || 'Default about us text.'
-      }
-    },
-    {
-      id: uuidv4(),
-      type: 'contact',
-      content: {
-        title: 'Get In Touch',
-        address: oldData.contact?.address || '123 Main St',
-        phone: oldData.contact?.phone || '555-1234',
-        email: oldData.contact?.email || 'contact@example.com'
-      }
-    }
-  ];
-
-  return {
-    businessName: businessName,
-    tagline: oldData.tagline || 'My amazing business tagline',
-    slug: oldData.slug || slugify(businessName),
-    heroImageUrl: oldData.heroImageUrl || 'https://picsum.photos/1200/600?random=1',
-    theme: oldData.theme || 'light',
-    sections: sections
-  };
-};
-
-const initialData = (): WebsiteData => {
-    try {
-      const savedData = localStorage.getItem('websiteData');
-      if (savedData) {
-        const parsedData = JSON.parse(savedData);
-        // If data is in the old format (doesn't have a 'sections' array), migrate it.
-        if (!parsedData.sections) {
-          console.log("Migrating old data format...");
-          return migrateToSectionBasedData(parsedData);
-        }
-        // Basic validation for new format
-        if (parsedData.businessName && Array.isArray(parsedData.sections)) {
-           // Add slug if missing for backward compatibility
-           if (!parsedData.slug) {
-             parsedData.slug = (parsedData.businessName || '').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-           }
-           // Ensure all list items have IDs for data saved before the ID-update
-          parsedData.sections.forEach((section: Section) => {
-            if (section.type === 'services' && section.content.services) {
-              section.content.services.forEach(item => { if (!item.id) item.id = uuidv4() });
-            } else if (section.type === 'gallery' && section.content.images) {
-              section.content.images.forEach(item => { if (!item.id) item.id = uuidv4() });
-            } else if (section.type === 'testimonials' && section.content.testimonials) {
-              section.content.testimonials.forEach(item => { if (!item.id) item.id = uuidv4() });
-            }
-          });
-          return parsedData;
-        }
-      }
-    } catch (e) {
-      console.error("Failed to parse website data from localStorage", e);
-      localStorage.removeItem('websiteData');
-    }
-
-    // Default data in the new section-based format
-    return {
-      businessName: 'Starlight Bakery',
-      tagline: 'Freshly baked goodness, every day.',
-      slug: 'starlight-bakery',
-      heroImageUrl: 'https://picsum.photos/1200/600?random=1',
-      theme: 'light',
-      sections: [
-        {
-          id: uuidv4(),
-          type: 'about',
-          content: {
-            title: 'About Us',
-            body: 'Founded in 2023, Starlight Bakery has been a beloved part of the community, offering delicious, handcrafted breads, pastries, and cakes. Our passion for quality ingredients and traditional baking methods is baked into every item we create.'
-          }
-        },
-        {
-          id: uuidv4(),
-          type: 'services',
-          content: {
-            title: 'Our Specialties',
-            services: [
-              { id: uuidv4(), name: 'Artisan Breads', description: 'Sourdough, rye, and whole wheat, baked fresh daily.' },
-              { id: uuidv4(), name: 'Custom Cakes', description: 'Beautifully designed cakes for any occasion.' },
-              { id: uuidv4(), name: 'Morning Pastries', description: 'Croissants, scones, and muffins to start your day right.' },
-            ]
-          }
-        },
-        {
-          id: uuidv4(),
-          type: 'contact',
-          content: {
-            title: 'Get In Touch',
-            address: '123 Main Street, Anytown, USA 12345',
-            phone: '(555) 123-4567',
-            email: 'contact@starlightbakery.com',
-          }
-        }
-      ]
-    };
-  };
-
-
 const AppContent: React.FC = () => {
     const navigate = useNavigate();
     
@@ -138,19 +25,63 @@ const AppContent: React.FC = () => {
         return sessionStorage.getItem('isAuthenticated') === 'true';
     });
 
-    const [websiteData, setWebsiteData] = useState<WebsiteData>(initialData);
+    const [websiteData, setWebsiteData] = useState<WebsiteData | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
+    // Effect to load data from the server
     useEffect(() => {
-        const handler = setTimeout(() => {
-        try {
-            localStorage.setItem('websiteData', JSON.stringify(websiteData));
-        } catch (e) {
-            console.error("Failed to save website data to localStorage", e);
+      // Only fetch data if authenticated.
+      if (!isAuthenticated) {
+          setIsLoading(false);
+          return;
+      }
+
+      const loadData = async () => {
+          setIsLoading(true);
+          setError(null);
+          try {
+              const response = await fetch('/api/editor-data');
+              if (!response.ok) {
+                  const errorData = await response.json().catch(() => ({}));
+                  throw new Error(errorData.message || 'Failed to load editor data.');
+              }
+              const data = await response.json();
+              setWebsiteData(data);
+          } catch (e) {
+              setError(e instanceof Error ? e.message : 'An unknown error occurred while loading data.');
+          } finally {
+              setIsLoading(false);
+          }
+      };
+
+      loadData();
+    }, [isAuthenticated]);
+
+
+    // Debounced effect to save data to the server
+    useEffect(() => {
+        // Don't save if data is null, or we are in the initial loading state.
+        if (!websiteData || isLoading) {
+            return;
         }
-        }, 500);
+
+        const handler = setTimeout(async () => {
+        try {
+            await fetch('/api/editor-data', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(websiteData)
+            });
+            // Optionally, add a "Saved" indicator here in the UI
+        } catch (e) {
+            console.error("Failed to save website data to server", e);
+            // Optionally, add a "Save failed" indicator
+        }
+        }, 1000); // Debounce saves by 1 second
 
         return () => clearTimeout(handler);
-    }, [websiteData]);
+    }, [websiteData, isLoading]);
 
     const handleLoginSuccess = (remember: boolean) => {
         if (remember) {
@@ -166,15 +97,38 @@ const AppContent: React.FC = () => {
         sessionStorage.removeItem('isAuthenticated');
         localStorage.removeItem('isAuthenticated'); // Clear persistent login as well
         setIsAuthenticated(false);
+        setWebsiteData(null); // Clear data on logout
         navigate('/');
     };
+    
+    if (isLoading && isAuthenticated) {
+        return (
+          <div className="flex items-center justify-center w-screen h-screen bg-slate-100 font-sans">
+            <div className="text-center">
+                <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                <p className="mt-4 text-slate-700 text-lg">Loading Editor...</p>
+            </div>
+          </div>
+        );
+    }
+    
+    if (error) {
+        return (
+          <div className="flex items-center justify-center w-screen h-screen bg-slate-100 font-sans p-4">
+            <div className="text-center bg-white p-8 rounded-lg shadow-md">
+              <h1 className="text-2xl font-bold text-red-600">Loading Error</h1>
+              <p className="mt-2 text-slate-700">{error}</p>
+            </div>
+          </div>
+        );
+    }
 
     return (
         <Routes>
             <Route 
                 path="/editor" 
                 element={
-                    isAuthenticated ? (
+                    isAuthenticated && websiteData ? (
                         <Editor 
                             websiteData={websiteData} 
                             setWebsiteData={setWebsiteData}
