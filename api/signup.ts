@@ -38,7 +38,12 @@ export default async function handler(request: Request) {
     }
 
     const hashedPassword = await hashPassword(password);
-    const newUser = { name, username, hashedPassword };
+    const newUser = { 
+        name, 
+        username, 
+        hashedPassword,
+        createdAt: new Date().toISOString() // Add timestamp
+    };
 
     // Store user data and add username to the master user set
     await Promise.all([
