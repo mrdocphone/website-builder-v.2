@@ -130,6 +130,11 @@ const AppContent: React.FC = () => {
         if (isDevelopment) {
             return true;
         }
+        // Check for persistent "Remember Me" login first
+        if (localStorage.getItem('isAuthenticated') === 'true') {
+            return true;
+        }
+        // Fallback to session-only login
         return sessionStorage.getItem('isAuthenticated') === 'true';
     });
 
@@ -147,14 +152,19 @@ const AppContent: React.FC = () => {
         return () => clearTimeout(handler);
     }, [websiteData]);
 
-    const handleLoginSuccess = () => {
-        sessionStorage.setItem('isAuthenticated', 'true');
+    const handleLoginSuccess = (remember: boolean) => {
+        if (remember) {
+            localStorage.setItem('isAuthenticated', 'true');
+        } else {
+            sessionStorage.setItem('isAuthenticated', 'true');
+        }
         setIsAuthenticated(true);
         navigate('/editor');
     };
 
     const handleLogout = () => {
         sessionStorage.removeItem('isAuthenticated');
+        localStorage.removeItem('isAuthenticated'); // Clear persistent login as well
         setIsAuthenticated(false);
         navigate('/');
     };
