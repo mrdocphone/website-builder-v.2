@@ -85,8 +85,11 @@ const AppContent: React.FC = () => {
                               }
                               if (s.type === 'testimonials' && Array.isArray(s.content?.testimonials)) {
                                   s.content.testimonials.forEach((testimonial: any) => {
-                                      elements.push({ id: uuidv4(), type: 'text', styles: { fontStyle: 'italic', textAlign: 'center', paddingBottom: '5px' }, content: { text: `"${testimonial.quote}"` }});
-                                      elements.push({ id: uuidv4(), type: 'text', styles: { textAlign: 'center', paddingBottom: '20px' }, content: { text: `- ${testimonial.author}` }});
+                                      // Add guard to prevent crash on malformed testimonial data
+                                      if (testimonial && typeof testimonial === 'object' && testimonial.quote && testimonial.author) {
+                                          elements.push({ id: uuidv4(), type: 'text', styles: { fontStyle: 'italic', textAlign: 'center', paddingBottom: '5px' }, content: { text: `"${testimonial.quote}"` }});
+                                          elements.push({ id: uuidv4(), type: 'text', styles: { textAlign: 'center', paddingBottom: '20px' }, content: { text: `- ${testimonial.author}` }});
+                                      }
                                   });
                               }
                               sectionContentRow.children = [{
@@ -98,7 +101,10 @@ const AppContent: React.FC = () => {
                               break;
                           case 'services':
                               if (Array.isArray(s.content?.services)) {
-                                  sectionContentRow.children = s.content.services.map((service: any): Column => ({
+                                  // Add filter to prevent crash on malformed service data
+                                  sectionContentRow.children = s.content.services
+                                    .filter((service: any) => service && typeof service === 'object' && service.name && service.description)
+                                    .map((service: any): Column => ({
                                       id: uuidv4(),
                                       type: 'column' as const,
                                       styles: { paddingLeft: '10px', paddingRight: '10px'},
@@ -111,7 +117,10 @@ const AppContent: React.FC = () => {
                               break;
                           case 'gallery':
                               if (Array.isArray(s.content?.images)) {
-                                  sectionContentRow.children = s.content.images.map((image: any): Column => ({
+                                  // Add filter to prevent crash on malformed image data
+                                  sectionContentRow.children = s.content.images
+                                    .filter((image: any) => image && typeof image === 'object' && image.url && image.alt)
+                                    .map((image: any): Column => ({
                                       id: uuidv4(),
                                       type: 'column' as const,
                                       styles: { paddingLeft: '10px', paddingRight: '10px' },
