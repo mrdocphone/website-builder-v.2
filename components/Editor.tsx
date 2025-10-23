@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import type { WebsiteData, Theme, Section, SectionType } from '../types';
+import type { Session } from '../App';
 import Preview from './Preview';
 import { generateSectionContent } from '../services/geminiService';
 import { 
@@ -8,6 +9,7 @@ import {
     TestimonialsIcon, ContactIcon, LogoutIcon, WarningIcon
 } from './icons';
 import { v4 as uuidv4 } from 'uuid';
+import { useNavigate } from 'react-router-dom';
 
 const SECTION_DEFAULTS = {
   about: { title: 'About Us', body: 'This is a new section about your company.' },
@@ -21,6 +23,7 @@ interface EditorProps {
   websiteData: WebsiteData;
   setWebsiteData: React.Dispatch<React.SetStateAction<WebsiteData>>;
   onLogout: () => void;
+  session: Session;
 }
 
 const PublishModal: React.FC<{ url: string; onClose: () => void }> = ({ url, onClose }) => {
@@ -86,7 +89,7 @@ const AddSectionModal: React.FC<{ onAdd: (type: SectionType) => void; onClose: (
     );
 };
 
-const Editor: React.FC<EditorProps> = ({ websiteData, setWebsiteData, onLogout }) => {
+const Editor: React.FC<EditorProps> = ({ websiteData, setWebsiteData, onLogout, session }) => {
   const [isGenerating, setIsGenerating] = useState<string | null>(null); // section ID
   const [error, setError] = useState<string | null>(null);
   const [showPublishModal, setShowPublishModal] = useState(false);
@@ -96,6 +99,7 @@ const Editor: React.FC<EditorProps> = ({ websiteData, setWebsiteData, onLogout }
   const [isPublishing, setIsPublishing] = useState(false);
   const [isKvConfigured, setIsKvConfigured] = useState(true);
   const [isCheckingKv, setIsCheckingKv] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const checkKvStatus = async () => {
@@ -106,12 +110,11 @@ const Editor: React.FC<EditorProps> = ({ websiteData, setWebsiteData, onLogout }
                 const data = await response.json();
                 setIsKvConfigured(data.isConfigured);
             } else {
-                // Fails in environments like AI Studio where the API route doesn't exist.
                 setIsKvConfigured(false);
             }
         } catch (e) {
             console.error("Failed to check KV status", e);
-            setIsKvConfigured(false); // Assume not configured on error
+            setIsKvConfigured(false);
         } finally {
             setIsCheckingKv(false);
         }
@@ -154,17 +157,19 @@ const Editor: React.FC<EditorProps> = ({ websiteData, setWebsiteData, onLogout }
         ? websiteData.slug 
         : slugify(websiteData.businessName);
 
-      const RESERVED_SLUGS = ['editor', 'site', 'api', 'login', 'index.html', 'favicon.ico'];
-      if (RESERVED_SLUGS.includes(slug)) {
+      const RESERVED_SLUGS = ['editor', 'site', 'api', 'login', 'admin', 'signup', 'index.html', 'favicon.ico'];
+      if (RESERVED_SLUGS.includes(slug) || slug === session.username) {
           throw new Error(`The slug "${slug}" is reserved. Please choose another.`);
       }
 
-      // Update state in case we had to generate a slug from an empty field
       if (slug !== websiteData.slug) {
         setWebsiteData(prev => ({ ...prev, slug }));
       }
 
-      const dataToPublish = { ...websiteData, slug };
+      const dataToPublish = { 
+          websiteData: { ...websiteData, slug },
+          username: session.username,
+      };
       
       const response = await fetch('/api/publish', {
           method: 'POST',
@@ -177,7 +182,9 @@ const Editor: React.FC<EditorProps> = ({ websiteData, setWebsiteData, onLogout }
           throw new Error(errorData.message || "Failed to publish on the server.");
       }
       
-      const url = `${window.location.origin}/${slug}`;
+      const url = session.type === 'admin' 
+        ? `${window.location.origin}/${slug}`
+        : `${window.location.origin}/${session.username}/${slug}`;
       
       setPublishedUrl(url);
       window.open(url, '_blank', 'noopener,noreferrer');
@@ -393,6 +400,15 @@ const renderSectionForm = (section: Section) => {
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold text-slate-800">Gen-Z Builder</h1>
           <div className="flex items-center space-x-2">
+            {session.type === 'admin' && (
+                <button 
+                  onClick={() => navigate('/admin')}
+                  className="p-2 bg-slate-200 text-slate-600 rounded-md hover:bg-slate-300"
+                  title="Back to Admin Dashboard"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" /></svg>
+                </button>
+            )}
             <button
               onClick={handlePublish}
               disabled={isPublishing || !isKvConfigured || isCheckingKv}
@@ -426,9 +442,9 @@ const renderSectionForm = (section: Section) => {
                             <p className="mb-2">To publish your site, you must connect a Vercel KV store. It's a quick, one-time setup.</p>
                             <ol className="list-decimal list-inside mt-2 space-y-1 font-medium">
                                 <li>Go to your Vercel project's <strong>Storage</strong> tab.</li>
-                                <li>Find <strong>Upstash</strong> (described as "Serverless DB") and click <strong>Create</strong>.</li>
-                                <li>Follow the prompts to connect it. You'll be asked to create a <strong>Redis Database</strong>.</li>
-                                <li>After connecting, you <strong>must Redeploy</strong> your project for the changes to take effect.</li>
+                                <li>Find <strong>Upstash</strong> and click <strong>Create</strong>.</li>
+                                <li>Follow the prompts to connect it.</li>
+                                <li>After connecting, you <strong>must Redeploy</strong> your project.</li>
                             </ol>
                         </div>
                     </div>

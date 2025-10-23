@@ -1,39 +1,52 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, useNavigate, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useNavigate, Navigate, Outlet } from 'react-router-dom';
 import Editor from './components/Editor';
 import PublishedWebsite from './components/PublishedWebsite';
 import Login from './components/Login';
-import AdminDashboard from './components/AdminDashboard';
-import type { WebsiteData, Section } from './types';
-import { v4 as uuidv4 } from 'uuid';
+import AdminDashboardLayout, { DashboardWelcome } from './components/AdminDashboard';
+import UserManagementDashboard from './components/UserManagementDashboard';
+import Signup from './components/Signup';
+import type { WebsiteData } from './types';
+
+export interface Session {
+    isAuthenticated: boolean;
+    type: 'admin' | 'user' | null;
+    username: string | null;
+}
+
+const getInitialSession = (): Session => {
+    // Check for persistent "Remember Me" login first
+    const storedSession = localStorage.getItem('session');
+    if (storedSession) {
+        try {
+            const parsed = JSON.parse(storedSession);
+            if (parsed.isAuthenticated) return parsed;
+        } catch (e) { /* ignore parsing error */ }
+    }
+    // Fallback to session-only login
+    const sessionOnly = sessionStorage.getItem('session');
+    if (sessionOnly) {
+        try {
+            const parsed = JSON.parse(sessionOnly);
+            if (parsed.isAuthenticated) return parsed;
+        } catch (e) { /* ignore parsing error */ }
+    }
+    // Default unauthenticated session
+    return { isAuthenticated: false, type: null, username: null };
+};
+
 
 const AppContent: React.FC = () => {
     const navigate = useNavigate();
     
-    // Check if we're in a development/preview environment like AI Studio
-    const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname.endsWith('.aistudio.dev');
-
-    const [isAuthenticated, setIsAuthenticated] = useState(() => {
-        // Bypass authentication for local development/preview in AI Studio
-        if (isDevelopment) {
-            return true;
-        }
-        // Check for persistent "Remember Me" login first
-        if (localStorage.getItem('isAuthenticated') === 'true') {
-            return true;
-        }
-        // Fallback to session-only login
-        return sessionStorage.getItem('isAuthenticated') === 'true';
-    });
-
+    const [session, setSession] = useState<Session>(getInitialSession());
     const [websiteData, setWebsiteData] = useState<WebsiteData | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     // Effect to load data from the server
     useEffect(() => {
-      // Only fetch data if authenticated.
-      if (!isAuthenticated) {
+      if (!session.isAuthenticated || !session.username) {
           setIsLoading(false);
           return;
       }
@@ -42,134 +55,121 @@ const AppContent: React.FC = () => {
           setIsLoading(true);
           setError(null);
           try {
-              const response = await fetch('/api/editor-data');
-              if (!response.ok) {
-                  const errorData = await response.json().catch(() => ({}));
-                  throw new Error(errorData.message || 'Failed to load editor data.');
-              }
+              const response = await fetch(`/api/editor-data?username=${session.username}`);
+              if (!response.ok) throw new Error('Failed to load editor data.');
               const data = await response.json();
               setWebsiteData(data);
           } catch (e) {
-              setError(e instanceof Error ? e.message : 'An unknown error occurred while loading data.');
+              setError(e instanceof Error ? e.message : 'An unknown error occurred.');
           } finally {
               setIsLoading(false);
           }
       };
-
       loadData();
-    }, [isAuthenticated]);
-
+    }, [session]);
 
     // Debounced effect to save data to the server
     useEffect(() => {
-        // Don't save if data is null, or we are in the initial loading state.
-        if (!websiteData || isLoading) {
-            return;
-        }
+        if (!websiteData || isLoading || !session.isAuthenticated || !session.username) return;
 
         const handler = setTimeout(async () => {
-        try {
-            await fetch('/api/editor-data', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(websiteData)
-            });
-            // Optionally, add a "Saved" indicator here in the UI
-        } catch (e) {
-            console.error("Failed to save website data to server", e);
-            // Optionally, add a "Save failed" indicator
-        }
-        }, 1000); // Debounce saves by 1 second
+            try {
+                await fetch('/api/editor-data', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ websiteData, username: session.username })
+                });
+            } catch (e) {
+                console.error("Failed to save website data to server", e);
+            }
+        }, 1000);
 
         return () => clearTimeout(handler);
-    }, [websiteData, isLoading]);
+    }, [websiteData, isLoading, session]);
 
-    const handleLoginSuccess = (remember: boolean) => {
+    const handleLoginSuccess = (data: { type: 'admin' | 'user'; username: string }, remember: boolean) => {
+        const newSession: Session = { isAuthenticated: true, ...data };
         if (remember) {
-            localStorage.setItem('isAuthenticated', 'true');
+            localStorage.setItem('session', JSON.stringify(newSession));
         } else {
-            sessionStorage.setItem('isAuthenticated', 'true');
+            sessionStorage.setItem('session', JSON.stringify(newSession));
         }
-        setIsAuthenticated(true);
-        navigate('/admin');
+        setSession(newSession);
+        navigate(data.type === 'admin' ? '/admin' : '/editor');
     };
+    
+    const handleSignupSuccess = (data: { type: 'user'; username: string }) => {
+        // Log in without "remember me" by default after signup
+        const newSession: Session = { isAuthenticated: true, ...data };
+        sessionStorage.setItem('session', JSON.stringify(newSession));
+        setSession(newSession);
+        navigate('/editor');
+    }
 
     const handleLogout = () => {
-        sessionStorage.removeItem('isAuthenticated');
-        localStorage.removeItem('isAuthenticated'); // Clear persistent login as well
-        setIsAuthenticated(false);
-        setWebsiteData(null); // Clear data on logout
-        navigate('/admin');
+        sessionStorage.removeItem('session');
+        localStorage.removeItem('session');
+        const unauthenticatedSession = { isAuthenticated: false, type: null, username: null };
+        setSession(unauthenticatedSession);
+        setWebsiteData(null);
+        navigate('/login');
     };
     
-    if (isLoading && isAuthenticated) {
-        return (
-          <div className="flex items-center justify-center w-screen h-screen bg-slate-100 font-sans">
-            <div className="text-center">
-                <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-                <p className="mt-4 text-slate-700 text-lg">Loading Editor Data...</p>
-            </div>
-          </div>
-        );
+    if (isLoading && session.isAuthenticated) {
+        return <div className="flex items-center justify-center h-screen"><div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div></div>;
+    }
+    if (error) {
+        return <div className="p-4 text-center text-red-600"><h1>Error</h1><p>{error}</p></div>;
     }
     
-    if (error) {
-        return (
-          <div className="flex items-center justify-center w-screen h-screen bg-slate-100 font-sans p-4">
-            <div className="text-center bg-white p-8 rounded-lg shadow-md">
-              <h1 className="text-2xl font-bold text-red-600">Loading Error</h1>
-              <p className="mt-2 text-slate-700">{error}</p>
-            </div>
-          </div>
-        );
-    }
+    const AdminRouteProtection = () => {
+      if (!session.isAuthenticated || session.type !== 'admin') {
+        return <Navigate to="/admin" replace />;
+      }
+      return <Outlet />;
+    };
+    
+    const UserRouteProtection = () => {
+      if (!session.isAuthenticated) {
+        return <Navigate to="/login" replace />;
+      }
+      return <Outlet />;
+    };
 
     return (
         <Routes>
-            <Route 
-                path="/editor" 
-                element={
-                    isAuthenticated && websiteData ? (
-                        <Editor 
-                            websiteData={websiteData} 
-                            setWebsiteData={setWebsiteData}
-                            onLogout={handleLogout}
-                        />
-                    ) : (
-                        <Navigate to="/admin" replace />
-                    )
-                }
-            />
+            {/* --- Public Routes --- */}
+            <Route path="/login" element={!session.isAuthenticated ? <Login type="user" onLoginSuccess={handleLoginSuccess} /> : <Navigate to="/editor" replace />} />
+            <Route path="/signup" element={!session.isAuthenticated ? <Signup onSignupSuccess={handleSignupSuccess} /> : <Navigate to="/editor" replace />} />
             
+            {/* --- Admin Login/Dashboard Routes --- */}
             <Route 
-                path="/admin" 
+                path="/admin/*" 
                 element={
-                    isAuthenticated ? (
-                        <AdminDashboard onLogout={handleLogout} />
+                    session.isAuthenticated && session.type === 'admin' ? (
+                        <AdminDashboardLayout onLogout={handleLogout}>
+                            <Routes>
+                                <Route index element={<DashboardWelcome />} />
+                                <Route path="users" element={<UserManagementDashboard />} />
+                            </Routes>
+                        </AdminDashboardLayout>
                     ) : (
                         <Login type="admin" onLoginSuccess={handleLoginSuccess} />
                     )
                 }
             />
 
-            <Route 
-                path="/login"
-                element={<Login type="user" />}
-            />
+            {/* --- User/Admin Protected Editor Route --- */}
+            <Route element={<UserRouteProtection />}>
+                <Route path="/editor" element={websiteData ? <Editor websiteData={websiteData} setWebsiteData={setWebsiteData} onLogout={handleLogout} session={session} /> : null} />
+            </Route>
             
-            <Route 
-                path="/" 
-                element={
-                    isAuthenticated ? (
-                        <Navigate to="/admin" replace />
-                    ) : (
-                        <Navigate to="/login" replace />
-                    )
-                }
-            />
+            {/* --- Root Redirect --- */}
+            <Route path="/" element={<Navigate to={session.isAuthenticated ? (session.type === 'admin' ? '/admin' : '/editor') : '/login'} replace />} />
             
-            {/* IMPORTANT: This route must be last to act as a catch-all for slugs */}
-            <Route path="/:slug" element={<PublishedWebsite />} />
+            {/* --- Published Site Routes (Catch-all) --- */}
+            <Route path="/:username/:slug" element={<PublishedWebsite />} />
+            <Route path="/:username" element={<PublishedWebsite />} />
         </Routes>
     );
 };

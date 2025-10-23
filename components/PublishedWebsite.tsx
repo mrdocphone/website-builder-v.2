@@ -4,32 +4,27 @@ import type { WebsiteData } from '../types';
 import Preview from './Preview';
 
 const PublishedWebsite: React.FC = () => {
-  const { slug } = useParams<{ slug: string }>();
+  const { username, slug } = useParams<{ username: string; slug?: string }>();
   const [websiteData, setWebsiteData] = useState<WebsiteData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // App-specific routes should not be treated as slugs.
-    // The router configuration in App.tsx prevents this component from rendering for these paths,
-    // so this is just a defensive check.
-    if (!slug) {
-      setError("This page does not exist.");
-      setIsLoading(false);
-      return;
-    }
+    // Combine username and slug for the API request. Handles cases where slug is undefined.
+    const slugToFetch = slug ? `${username}/${slug}` : username;
 
     const fetchWebsiteData = async () => {
         setIsLoading(true);
         setError(null);
         try {
-            const response = await fetch(`/api/site?slug=${slug}`);
+            const response = await fetch(`/api/site?slug=${slugToFetch}`);
 
             if (response.status === 404) {
                 throw new Error("We couldn't find a website at this address. Please check the URL.");
             }
             if (!response.ok) {
-                throw new Error("An error occurred while loading the website.");
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.message || "An error occurred while loading the website.");
             }
 
             const parsedData = await response.json();
@@ -50,7 +45,7 @@ const PublishedWebsite: React.FC = () => {
     
     fetchWebsiteData();
 
-  }, [slug]);
+  }, [username, slug]);
 
   if (isLoading) {
     return (
@@ -75,7 +70,6 @@ const PublishedWebsite: React.FC = () => {
   }
 
   if (!websiteData) {
-    // This case is covered by error or loading, but acts as a fallback.
     return null;
   }
 

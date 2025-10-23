@@ -17,20 +17,19 @@ export default async function handler(request: Request) {
 
   try {
     const { searchParams } = new URL(request.url);
-    const slug = searchParams.get('slug');
+    const slugParam = searchParams.get('slug');
 
-    if (!slug) {
+    if (!slugParam) {
         return new Response(JSON.stringify({ message: 'Slug is required.' }), { 
             status: 400, 
             headers: { 'Content-Type': 'application/json' } 
         });
     }
 
-    // Vercel KV automatically parses JSON, so kv.get() returns an object.
-    const websiteData = await kv.get<WebsiteData>(slug);
+    const key = `site:${slugParam.replace('/', ':')}`;
+    const websiteData = await kv.get<WebsiteData>(key);
 
     if (websiteData) {
-        // We must re-stringify the object to send it as a valid JSON response.
         return new Response(JSON.stringify(websiteData), { 
             status: 200, 
             headers: { 'Content-Type': 'application/json' } 

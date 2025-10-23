@@ -16,9 +16,11 @@ export default async function handler(request: Request) {
   }
 
   try {
-    const websiteData = (await request.json()) as WebsiteData;
+    const { websiteData, username } = (await request.json()) as { websiteData: WebsiteData, username: string };
 
-    // Basic validation
+    if (!username) {
+        return new Response(JSON.stringify({ message: 'User not identified.' }), { status: 401 });
+    }
     if (!websiteData || !websiteData.slug || !websiteData.businessName) {
       return new Response(JSON.stringify({ message: 'Invalid data provided.' }), { 
         status: 400, 
@@ -26,9 +28,8 @@ export default async function handler(request: Request) {
       });
     }
 
-    // Store the data in Vercel KV with the slug as the key
-    // We store it as a string to be retrieved by the site loader API.
-    await kv.set(websiteData.slug, JSON.stringify(websiteData));
+    const key = `site:${username}:${websiteData.slug}`;
+    await kv.set(key, JSON.stringify(websiteData));
 
     return new Response(JSON.stringify({ success: true, slug: websiteData.slug }), { 
       status: 200, 

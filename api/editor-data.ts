@@ -8,17 +8,17 @@ export const config = {
   runtime: 'edge',
 };
 
-// Use a consistent key to store the single admin user's editor data.
-const EDITOR_DATA_KEY = 'editor-data:admin';
+const getEditorDataKey = (username: string) => `editor-data:${username}`;
 
-const getDefaultData = (): WebsiteData => {
+const getDefaultData = (username: string): WebsiteData => {
+  const isDefaultAdmin = username === 'admin';
   return {
-    businessName: 'Starlight Bakery',
-    tagline: 'Freshly baked goodness, every day.',
-    slug: 'starlight-bakery',
-    heroImageUrl: 'https://picsum.photos/1200/600?random=1',
+    businessName: isDefaultAdmin ? 'Starlight Bakery' : 'My New Business',
+    tagline: isDefaultAdmin ? 'Freshly baked goodness, every day.' : 'Your amazing tagline here!',
+    slug: isDefaultAdmin ? 'starlight-bakery' : username,
+    heroImageUrl: `https://picsum.photos/1200/600?random=${Math.floor(Math.random() * 10)}`,
     theme: 'light',
-    sections: [
+    sections: isDefaultAdmin ? [
       {
         id: uuidv4(),
         type: 'about',
@@ -38,17 +38,13 @@ const getDefaultData = (): WebsiteData => {
             { id: uuidv4(), name: 'Morning Pastries', description: 'Croissants, scones, and muffins to start your day right.' },
           ]
         }
-      },
-      {
-        id: uuidv4(),
-        type: 'contact',
-        content: {
-          title: 'Get In Touch',
-          address: '123 Main Street, Anytown, USA 12345',
-          phone: '(555) 123-4567',
-          email: 'contact@starlightbakery.com',
-        }
       }
+    ] : [
+        {
+            id: uuidv4(),
+            type: 'about',
+            content: { title: 'About Us', body: 'Tell your customers about your business.' }
+        }
     ]
   };
 };
@@ -56,31 +52,45 @@ const getDefaultData = (): WebsiteData => {
 export default async function handler(request: Request) {
     if (request.method === 'GET') {
         try {
-            const data = await kv.get<WebsiteData>(EDITOR_DATA_KEY);
-            const responseData = data || getDefaultData();
+            const { searchParams } = new URL(request.url);
+            const username = searchParams.get('username');
+
+            if (!username) {
+                return new Response(JSON.stringify({ message: 'Username is required.' }), { status: 400 });
+            }
+
+            const key = getEditorDataKey(username);
+            const data = await kv.get<WebsiteData>(key);
+            const responseData = data || getDefaultData(username);
+            
             return new Response(JSON.stringify(responseData), {
                 status: 200,
                 headers: { 'Content-Type': 'application/json' }
             });
         } catch (error) {
             console.error('Error fetching editor data:', error);
-            return new Response(JSON.stringify({ message: 'Failed to retrieve editor data.' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+            return new Response(JSON.stringify({ message: 'Failed to retrieve editor data.' }), { status: 500 });
         }
     }
 
     if (request.method === 'POST') {
         try {
-            const websiteData = await request.json();
-            if (!websiteData || !websiteData.businessName || !websiteData.sections) {
-                 return new Response(JSON.stringify({ message: 'Invalid data format.' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+            const { websiteData, username } = await request.json();
+            if (!username) {
+                return new Response(JSON.stringify({ message: 'Username is required.' }), { status: 400 });
             }
-            await kv.set(EDITOR_DATA_KEY, JSON.stringify(websiteData));
-            return new Response(JSON.stringify({ success: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+            if (!websiteData || !websiteData.businessName || !websiteData.sections) {
+                 return new Response(JSON.stringify({ message: 'Invalid data format.' }), { status: 400 });
+            }
+            
+            const key = getEditorDataKey(username);
+            await kv.set(key, JSON.stringify(websiteData));
+            return new Response(JSON.stringify({ success: true }), { status: 200 });
         } catch (error) {
             console.error('Error saving editor data:', error);
-            return new Response(JSON.stringify({ message: 'Failed to save editor data.' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+            return new Response(JSON.stringify({ message: 'Failed to save editor data.' }), { status: 500 });
         }
     }
 
-    return new Response(JSON.stringify({ message: 'Method Not Allowed' }), { status: 405, headers: { 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify({ message: 'Method Not Allowed' }), { status: 405 });
 }
