@@ -98,7 +98,7 @@ const AppContent: React.FC = () => {
         localStorage.removeItem('isAuthenticated'); // Clear persistent login as well
         setIsAuthenticated(false);
         setWebsiteData(null); // Clear data on logout
-        navigate('/');
+        navigate('/admin');
     };
     
     if (isLoading && isAuthenticated) {
@@ -135,9 +135,25 @@ const AppContent: React.FC = () => {
                             onLogout={handleLogout}
                         />
                     ) : (
-                        <Navigate to="/" replace />
+                        <Navigate to="/admin" replace />
                     )
                 }
+            />
+            
+            <Route 
+                path="/admin" 
+                element={
+                    isAuthenticated ? (
+                        <Navigate to="/editor" replace />
+                    ) : (
+                        <Login type="admin" onLoginSuccess={handleLoginSuccess} />
+                    )
+                }
+            />
+
+            <Route 
+                path="/login"
+                element={<Login type="user" />}
             />
             
             <Route 
@@ -146,7 +162,7 @@ const AppContent: React.FC = () => {
                     isAuthenticated ? (
                         <Navigate to="/editor" replace />
                     ) : (
-                        <Login onLoginSuccess={handleLoginSuccess} />
+                        <Navigate to="/login" replace />
                     )
                 }
             />

@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { WarningIcon } from './icons';
 
 interface LoginProps {
-  onLoginSuccess: (remember: boolean) => void;
+  onLoginSuccess?: (remember: boolean) => void;
+  type: 'admin' | 'user';
 }
 
-const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
+const Login: React.FC<LoginProps> = ({ onLoginSuccess, type }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
@@ -14,7 +15,9 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   const [isSetupMissing, setIsSetupMissing] = useState(false);
 
   useEffect(() => {
-    // Check with the server if custom credentials are set
+    if (type !== 'admin') return;
+    
+    // Check with the server if custom credentials are set for admin
     const checkConfig = async () => {
         try {
             const res = await fetch('/api/config');
@@ -22,7 +25,6 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                 const data = await res.json();
                 setIsSetupMissing(!data.isConfigured);
             } else {
-                // If the check fails, assume setup is missing to be safe
                 setIsSetupMissing(true);
             }
         } catch (e) {
@@ -31,10 +33,10 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         }
     };
     checkConfig();
-  }, []);
+  }, [type]);
 
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleAdminSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
@@ -49,7 +51,9 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         const data = await response.json();
 
         if (response.ok && data.success) {
-            onLoginSuccess(rememberMe);
+            if (onLoginSuccess) {
+              onLoginSuccess(rememberMe);
+            }
         } else {
             setError(data.message || 'Invalid username or password.');
         }
@@ -59,16 +63,28 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         setIsLoading(false);
     }
   };
+  
+  const handleUserSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("User login is not implemented yet.");
+  };
+
+  const handleSubmit = type === 'admin' ? handleAdminSubmit : handleUserSubmit;
+
+  const pageTitle = type === 'admin' ? 'Gen-Z Builder Admin' : 'User Login';
+  const subtitle = type === 'admin' ? 'Access the website editor' : 'Access your account';
+  const usernamePlaceholder = type === 'admin' ? (isSetupMissing ? "Default: admin" : "Username") : "Your Username";
+  const passwordPlaceholder = type === 'admin' ? (isSetupMissing ? "Default: password" : "Password") : "Your Password";
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-slate-100 font-sans p-4">
       <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-xl">
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-slate-800">Gen-Z Builder Login</h1>
-          <p className="mt-2 text-slate-600">Access the Gen-Z Builder</p>
+          <h1 className="text-3xl font-bold text-slate-800">{pageTitle}</h1>
+          <p className="mt-2 text-slate-600">{subtitle}</p>
         </div>
         
-        {isSetupMissing && (
+        {type === 'admin' && isSetupMissing && (
             <div className="bg-amber-50 border-l-4 border-amber-400 p-4 rounded-r-lg">
                 <div className="flex">
                     <div className="flex-shrink-0">
@@ -105,7 +121,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-              placeholder={isSetupMissing ? "Default: admin" : "Username"}
+              placeholder={usernamePlaceholder}
             />
           </div>
           <div>
@@ -124,7 +140,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-              placeholder={isSetupMissing ? "Default: password" : "Password"}
+              placeholder={passwordPlaceholder}
             />
           </div>
 
