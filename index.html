@@ -41,6 +41,54 @@
         }
       }
     </script>
+    <style>
+      .preview-section-wrapper {
+        position: relative;
+        cursor: pointer;
+      }
+      .preview-section-wrapper .edit-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(99, 102, 241, 0.1);
+        border: 2px solid #4f46e5;
+        opacity: 0;
+        transition: opacity 0.2s ease-in-out;
+        z-index: 10;
+        pointer-events: none; /* Allows clicks to go through if needed, though we capture on wrapper */
+      }
+      .preview-section-wrapper.selected .edit-overlay,
+      .preview-section-wrapper:hover .edit-overlay {
+        opacity: 1;
+      }
+      .preview-section-wrapper .edit-badge {
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
+        background-color: #4f46e5;
+        color: white;
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.875rem;
+        font-weight: 500;
+        z-index: 11;
+        opacity: 0;
+        transition: opacity 0.2s ease-in-out;
+      }
+      .preview-section-wrapper.selected .edit-badge,
+      .preview-section-wrapper:hover .edit-badge {
+        opacity: 1;
+      }
+      .dragging-placeholder {
+        background-color: #eef2ff;
+        border: 2px dashed #a5b4fc;
+      }
+      .dragging-placeholder > * {
+        visibility: hidden;
+      }
+    </style>
   <script type="importmap">
 {
   "imports": {

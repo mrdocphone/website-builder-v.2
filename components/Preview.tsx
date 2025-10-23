@@ -4,6 +4,8 @@ import { LocationMarkerIcon, MailIcon, PhoneIcon } from './icons';
 
 interface PreviewProps {
   websiteData: WebsiteData;
+  selectedSectionId: string | null;
+  onSelectSection: (sectionId: string) => void;
 }
 
 const themeConfigs: Record<Theme, ThemeConfig> = {
@@ -51,7 +53,7 @@ const themeConfigs: Record<Theme, ThemeConfig> = {
 
 // Individual Section Components
 const AboutSection: React.FC<{ section: Extract<Section, { type: 'about' }>, theme: ThemeConfig }> = ({ section, theme }) => (
-    <section id={section.id} className="py-16 px-6 md:px-12">
+    <section className="py-16 px-6 md:px-12">
         <div className="max-w-4xl mx-auto">
             <h3 className={`text-3xl font-bold text-center mb-8 ${theme.headerText}`}>{section.content.title}</h3>
             <p className="text-lg leading-relaxed whitespace-pre-wrap">{section.content.body}</p>
@@ -60,7 +62,7 @@ const AboutSection: React.FC<{ section: Extract<Section, { type: 'about' }>, the
 );
 
 const ServicesSection: React.FC<{ section: Extract<Section, { type: 'services' }>, theme: ThemeConfig }> = ({ section, theme }) => (
-    <section id={section.id} className={`py-16 px-6 md:px-12 ${theme.secondary}`}>
+    <section className={`py-16 px-6 md:px-12 ${theme.secondary}`}>
         <div className="max-w-4xl mx-auto">
             <h3 className={`text-3xl font-bold text-center mb-10 ${theme.headerText}`}>{section.content.title}</h3>
             <div className="grid md:grid-cols-3 gap-8">
@@ -76,7 +78,7 @@ const ServicesSection: React.FC<{ section: Extract<Section, { type: 'services' }
 );
 
 const GallerySection: React.FC<{ section: Extract<Section, { type: 'gallery' }>, theme: ThemeConfig }> = ({ section, theme }) => (
-    <section id={section.id} className="py-16 px-6 md:px-12">
+    <section className="py-16 px-6 md:px-12">
         <div className="max-w-5xl mx-auto">
             <h3 className={`text-3xl font-bold text-center mb-10 ${theme.headerText}`}>{section.content.title}</h3>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -89,7 +91,7 @@ const GallerySection: React.FC<{ section: Extract<Section, { type: 'gallery' }>,
 );
 
 const TestimonialsSection: React.FC<{ section: Extract<Section, { type: 'testimonials' }>, theme: ThemeConfig }> = ({ section, theme }) => (
-     <section id={section.id} className={`py-16 px-6 md:px-12 ${theme.secondary}`}>
+     <section className={`py-16 px-6 md:px-12 ${theme.secondary}`}>
         <div className="max-w-4xl mx-auto">
             <h3 className={`text-3xl font-bold text-center mb-10 ${theme.headerText}`}>{section.content.title}</h3>
             <div className="grid md:grid-cols-2 gap-8">
@@ -105,7 +107,7 @@ const TestimonialsSection: React.FC<{ section: Extract<Section, { type: 'testimo
 );
 
 const ContactSection: React.FC<{ section: Extract<Section, { type: 'contact' }>, theme: ThemeConfig }> = ({ section, theme }) => (
-    <section id={section.id} className={`py-16 px-6 md:px-12 ${theme.secondary}`}>
+    <section className={`py-16 px-6 md:px-12 ${theme.secondary}`}>
         <div className="max-w-4xl mx-auto">
             <h3 className={`text-3xl font-bold text-center mb-10 ${theme.headerText}`}>{section.content.title}</h3>
             <div className="grid md:grid-cols-3 gap-8 text-center">
@@ -130,7 +132,7 @@ const ContactSection: React.FC<{ section: Extract<Section, { type: 'contact' }>,
 );
 
 
-const Preview: React.FC<PreviewProps> = ({ websiteData }) => {
+const Preview: React.FC<PreviewProps> = ({ websiteData, selectedSectionId, onSelectSection }) => {
   const theme = themeConfigs[websiteData.theme] || themeConfigs.light;
 
   const renderSection = (section: Section) => {
@@ -164,11 +166,20 @@ const Preview: React.FC<PreviewProps> = ({ websiteData }) => {
 
       {/* Dynamic Sections */}
       <main>
-        {websiteData.sections.map(section => (
-            <React.Fragment key={section.id}>
-                {renderSection(section)}
-            </React.Fragment>
-        ))}
+        {websiteData.sections.map(section => {
+            const isSelected = section.id === selectedSectionId;
+            return (
+              <div 
+                key={section.id} 
+                className={`preview-section-wrapper ${isSelected ? 'selected' : ''}`}
+                onClick={() => onSelectSection(section.id)}
+              >
+                  <div className="edit-overlay"></div>
+                  <div className="edit-badge">Editing</div>
+                  {renderSection(section)}
+              </div>
+            )
+        })}
       </main>
 
       {/* Footer */}

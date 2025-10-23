@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import type { WebsiteData, Theme, Section, SectionType } from '../types';
 import type { Session } from '../App';
 import Preview from './Preview';
@@ -64,11 +64,20 @@ const Editor: React.FC<EditorProps> = ({ websiteData, setWebsiteData, onLogout, 
   const [showPublishModal, setShowPublishModal] = useState(false);
   const [publishedUrl, setPublishedUrl] = useState('');
   const [showAddSectionModal, setShowAddSectionModal] = useState(false);
-  const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
+  const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
   const [isKvConfigured, setIsKvConfigured] = useState(true);
   const [isCheckingKv, setIsCheckingKv] = useState(true);
   const navigate = useNavigate();
+
+  const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  useEffect(() => {
+    if (selectedSectionId && sectionRefs.current[selectedSectionId]) {
+      sectionRefs.current[selectedSectionId]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [selectedSectionId]);
+
 
   useEffect(() => {
     const checkKvStatus = async () => {
@@ -152,7 +161,7 @@ const Editor: React.FC<EditorProps> = ({ websiteData, setWebsiteData, onLogout, 
     };
     setWebsiteData(prev => ({ ...prev, sections: [...prev.sections, newSection] }));
     setShowAddSectionModal(false);
-    setEditingSectionId(newSection.id);
+    setSelectedSectionId(newSection.id);
   }, [setWebsiteData]);
 
   const handleRemoveSection = useCallback((sectionId: string) => {
@@ -164,20 +173,18 @@ const Editor: React.FC<EditorProps> = ({ websiteData, setWebsiteData, onLogout, 
     }
   }, [setWebsiteData]);
 
-  const handleMoveSection = useCallback((sectionId: string, direction: 'up' | 'down') => {
-      setWebsiteData(prev => {
-        const index = prev.sections.findIndex(s => s.id === sectionId);
-        if (index === -1) return prev;
-
-        const newIndex = direction === 'up' ? index - 1 : index + 1;
-        if (newIndex < 0 || newIndex >= prev.sections.length) return prev;
+  const handleMoveSection = useCallback((draggedId: string, targetId: string) => {
+    setWebsiteData(prev => {
+        const draggedIndex = prev.sections.findIndex(s => s.id === draggedId);
+        const targetIndex = prev.sections.findIndex(s => s.id === targetId);
+        if (draggedIndex === -1 || targetIndex === -1) return prev;
 
         const newSections = [...prev.sections];
-        const [movedSection] = newSections.splice(index, 1);
-        newSections.splice(newIndex, 0, movedSection);
+        const [movedSection] = newSections.splice(draggedIndex, 1);
+        newSections.splice(targetIndex, 0, movedSection);
         
         return {...prev, sections: newSections};
-      });
+    });
   }, [setWebsiteData]);
 
   const handleSectionContentChange = useCallback((sectionId: string, newContent: any) => {
@@ -201,8 +208,8 @@ const Editor: React.FC<EditorProps> = ({ websiteData, setWebsiteData, onLogout, 
     }
   }, [websiteData, handleSectionContentChange]);
 
-  const handleToggleEdit = useCallback((sectionId: string) => {
-    setEditingSectionId(prevId => (prevId === sectionId ? null : sectionId));
+  const handleSelectSection = useCallback((sectionId: string) => {
+    setSelectedSectionId(prevId => (prevId === sectionId ? null : sectionId));
   }, []);
 
   const themes: { id: Theme; label: string; colors: string[] }[] = [
@@ -288,19 +295,18 @@ const Editor: React.FC<EditorProps> = ({ websiteData, setWebsiteData, onLogout, 
             </div>
             <div className="space-y-2">
                 {websiteData.sections.map((section, index) => (
-                   <EditorSectionItem
-                        key={section.id}
-                        section={section}
-                        index={index}
-                        totalSections={websiteData.sections.length}
-                        editingSectionId={editingSectionId}
-                        isGenerating={isGenerating === section.id}
-                        onMoveSection={handleMoveSection}
-                        onRemoveSection={handleRemoveSection}
-                        onToggleEdit={handleToggleEdit}
-                        onContentChange={handleSectionContentChange}
-                        onGenerate={handleGenerateContent}
-                   />
+                   <div key={section.id} ref={el => sectionRefs.current[section.id] = el}>
+                       <EditorSectionItem
+                            section={section}
+                            selectedSectionId={selectedSectionId}
+                            isGenerating={isGenerating === section.id}
+                            onMoveSection={handleMoveSection}
+                            onRemoveSection={handleRemoveSection}
+                            onSelectSection={handleSelectSection}
+                            onContentChange={handleSectionContentChange}
+                            onGenerate={handleGenerateContent}
+                       />
+                   </div>
                 ))}
             </div>
              {error && <p className="text-xs text-red-500 mt-2 p-2 bg-red-50 rounded-md border border-red-200">{error}</p>}
@@ -325,7 +331,11 @@ const Editor: React.FC<EditorProps> = ({ websiteData, setWebsiteData, onLogout, 
       </aside>
       <main className="w-full flex-1 bg-slate-200 p-6 flex items-center justify-center">
         <div className="w-full h-full max-w-full max-h-full bg-white rounded-lg shadow-lg overflow-hidden transform scale-[0.9] origin-center">
-            <Preview websiteData={websiteData} />
+            <Preview 
+                websiteData={websiteData} 
+                selectedSectionId={selectedSectionId}
+                onSelectSection={setSelectedSectionId}
+            />
         </div>
       </main>
     </div>

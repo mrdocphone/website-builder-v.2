@@ -1,47 +1,82 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { Section } from '../types';
 import SectionEditorForm from './SectionEditorForm';
-import { ArrowUpIcon, ArrowDownIcon, PencilIcon, TrashIcon } from './icons';
+import { PencilIcon, TrashIcon, DragHandleIcon } from './icons';
 
 interface EditorSectionItemProps {
     section: Section;
-    index: number;
-    totalSections: number;
-    editingSectionId: string | null;
+    selectedSectionId: string | null;
     isGenerating: boolean;
-    onMoveSection: (sectionId: string, direction: 'up' | 'down') => void;
+    onMoveSection: (draggedId: string, targetId: string) => void;
     onRemoveSection: (sectionId: string) => void;
-    onToggleEdit: (sectionId: string) => void;
+    onSelectSection: (sectionId: string) => void;
     onContentChange: (sectionId: string, newContent: any) => void;
     onGenerate: (section: Section) => void;
 }
 
 const EditorSectionItem: React.FC<EditorSectionItemProps> = ({
     section,
-    index,
-    totalSections,
-    editingSectionId,
+    selectedSectionId,
     isGenerating,
     onMoveSection,
     onRemoveSection,
-    onToggleEdit,
+    onSelectSection,
     onContentChange,
     onGenerate,
 }) => {
-    const isEditing = editingSectionId === section.id;
+    const [isDraggingOver, setIsDraggingOver] = useState(false);
+    const isSelected = selectedSectionId === section.id;
+
+    const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
+        e.dataTransfer.setData("sectionId", section.id);
+        e.dataTransfer.effectAllowed = "move";
+    };
+    
+    const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        setIsDraggingOver(true);
+    };
+
+    const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+        setIsDraggingOver(false);
+    };
+
+    const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        const draggedId = e.dataTransfer.getData("sectionId");
+        if (draggedId && draggedId !== section.id) {
+            onMoveSection(draggedId, section.id);
+        }
+        setIsDraggingOver(false);
+    };
+
 
     return (
-        <div className="bg-white p-3 border border-slate-200 rounded-lg shadow-sm">
-            <div className="flex items-center justify-between">
-                <span className="font-medium text-slate-600 capitalize">{section.type}</span>
+        <div 
+            draggable
+            onDragStart={handleDragStart}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            className={`
+                bg-white border border-slate-200 rounded-lg shadow-sm transition-shadow duration-200
+                ${isSelected ? 'border-indigo-500 ring-2 ring-indigo-200' : ''}
+                ${isDraggingOver ? 'dragging-placeholder' : ''}
+            `}
+        >
+            <div className="flex items-center justify-between p-3">
+                <div className="flex items-center">
+                    <div className="cursor-move touch-none mr-2 text-slate-400">
+                        <DragHandleIcon className="w-5 h-5" />
+                    </div>
+                    <span className="font-medium text-slate-600 capitalize">{section.type}</span>
+                </div>
                 <div className="flex items-center space-x-2">
-                    <button onClick={() => onMoveSection(section.id, 'up')} disabled={index === 0} className="disabled:opacity-30"><ArrowUpIcon className="w-5 h-5 text-slate-500 hover:text-slate-800"/></button>
-                    <button onClick={() => onMoveSection(section.id, 'down')} disabled={index === totalSections - 1} className="disabled:opacity-30"><ArrowDownIcon className="w-5 h-5 text-slate-500 hover:text-slate-800"/></button>
-                    <button onClick={() => onToggleEdit(section.id)}><PencilIcon className={`w-5 h-5 transition-colors ${isEditing ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-800'}`} /></button>
-                    <button onClick={() => onRemoveSection(section.id)}><TrashIcon className="w-5 h-5 text-red-400 hover:text-red-600"/></button>
+                    <button onClick={() => onSelectSection(section.id)} title="Edit Section"><PencilIcon className={`w-5 h-5 transition-colors ${isSelected ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-800'}`} /></button>
+                    <button onClick={() => onRemoveSection(section.id)} title="Delete Section"><TrashIcon className="w-5 h-5 text-red-400 hover:text-red-600"/></button>
                 </div>
             </div>
-            {isEditing && (
+            {isSelected && (
                 <SectionEditorForm 
                     section={section}
                     onContentChange={onContentChange}
