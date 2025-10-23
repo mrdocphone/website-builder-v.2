@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import type { WebsiteData } from '../types';
 
 interface GlobalSettingsFormProps {
@@ -7,15 +7,51 @@ interface GlobalSettingsFormProps {
 }
 
 const GlobalSettingsForm: React.FC<GlobalSettingsFormProps> = ({ websiteData, setWebsiteData }) => {
+  const [settings, setSettings] = useState({
+    businessName: websiteData.businessName,
+    tagline: websiteData.tagline,
+    slug: websiteData.slug,
+  });
+
+  // Sync local state if external data changes (e.g., initial load)
+  useEffect(() => {
+    setSettings({
+      businessName: websiteData.businessName,
+      tagline: websiteData.tagline,
+      slug: websiteData.slug,
+    });
+  }, [websiteData.businessName, websiteData.tagline, websiteData.slug]);
+
+  // Debounce updates to the parent component to avoid re-renders on every keystroke
+  useEffect(() => {
+    // Prevent updating on the initial render when states are already in sync
+    if (settings.businessName === websiteData.businessName && settings.tagline === websiteData.tagline && settings.slug === websiteData.slug) {
+        return;
+    }
+
+    const handler = setTimeout(() => {
+      setWebsiteData(prev => ({
+        ...prev,
+        businessName: settings.businessName,
+        tagline: settings.tagline,
+        slug: settings.slug,
+      }));
+    }, 400); // 400ms debounce
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [settings, setWebsiteData, websiteData.businessName, websiteData.tagline, websiteData.slug]);
   
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    if (name === 'slug') {
-      const slugified = value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-      setWebsiteData(prev => ({ ...prev, slug: slugified }));
-    } else {
-      setWebsiteData(prev => ({ ...prev, [name]: value }));
-    }
+    setSettings(prev => {
+        if (name === 'slug') {
+            const slugified = value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+            return { ...prev, slug: slugified };
+        }
+        return { ...prev, [name]: value };
+    });
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -35,15 +71,15 @@ const GlobalSettingsForm: React.FC<GlobalSettingsFormProps> = ({ websiteData, se
       <div className="space-y-4">
         <div>
           <label className="text-sm font-medium text-slate-600 block mb-1">Business Name</label>
-          <input type="text" name="businessName" value={websiteData.businessName} onChange={handleInputChange} className="w-full p-2 border border-slate-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500" />
+          <input type="text" name="businessName" value={settings.businessName} onChange={handleInputChange} className="w-full p-2 border border-slate-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500" />
         </div>
         <div>
           <label className="text-sm font-medium text-slate-600 block mb-1">Tagline</label>
-          <input type="text" name="tagline" value={websiteData.tagline} onChange={handleInputChange} className="w-full p-2 border border-slate-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500" />
+          <input type="text" name="tagline" value={settings.tagline} onChange={handleInputChange} className="w-full p-2 border border-slate-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500" />
         </div>
         <div>
           <label className="text-sm font-medium text-slate-600 block mb-1">Website Slug</label>
-          <input type="text" name="slug" value={websiteData.slug} onChange={handleInputChange} placeholder="my-cool-business" className="w-full p-2 border border-slate-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500" />
+          <input type="text" name="slug" value={settings.slug} onChange={handleInputChange} placeholder="my-cool-business" className="w-full p-2 border border-slate-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500" />
           <p className="text-xs text-slate-500 mt-1">Used for the shareable URL. Lowercase letters, numbers, and dashes only.</p>
         </div>
         <div>
@@ -55,4 +91,4 @@ const GlobalSettingsForm: React.FC<GlobalSettingsFormProps> = ({ websiteData, se
   );
 };
 
-export default React.memo(GlobalSettingsForm);
+export default GlobalSettingsForm;

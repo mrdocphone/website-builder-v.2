@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import type { Section } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import { MagicWandIcon, TrashIcon } from './icons';
@@ -11,16 +11,44 @@ interface SectionEditorFormProps {
 }
 
 const SectionEditorForm: React.FC<SectionEditorFormProps> = ({ section, onContentChange, onGenerate, isGenerating }) => {
-    const content = section.content as any;
+    const [localContent, setLocalContent] = useState(section.content);
+
+    // Sync local state if the parent prop changes (e.g., from AI generation or loading)
+    useEffect(() => {
+        setLocalContent(section.content);
+    }, [section.content]);
+
+    // Debounce updates to the parent component
+    useEffect(() => {
+        // A simple string comparison to check for changes before setting a timer.
+        if (JSON.stringify(localContent) === JSON.stringify(section.content)) {
+            return;
+        }
+
+        const handler = setTimeout(() => {
+            onContentChange(section.id, localContent);
+        }, 400);
+
+        return () => {
+            clearTimeout(handler);
+        };
+    }, [localContent, onContentChange, section.id, section.content]);
 
     const baseInput = "w-full p-2 border border-slate-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-sm";
     const baseLabel = "text-sm font-medium text-slate-600 block mb-1";
 
+    // --- Local State Handlers ---
+    // All handlers now update the fast, local state (`localContent`) instead of the slow parent state.
+
+    const handleFieldChange = (field: string, value: any) => {
+        setLocalContent(prev => ({ ...prev, [field]: value }));
+    };
+
     const handleItemChange = (itemId: string, field: string, value: string) => {
         const key = section.type === 'services' ? 'services' : section.type === 'gallery' ? 'images' : 'testimonials';
-        const items = content[key];
+        const items = (localContent as any)[key];
         const updatedItems = items.map((item: any) => item.id === itemId ? { ...item, [field]: value } : item);
-        onContentChange(section.id, { ...content, [key]: updatedItems });
+        setLocalContent(prev => ({ ...prev, [key]: updatedItems }));
     };
 
     const handleAddItem = () => {
@@ -41,14 +69,17 @@ const SectionEditorForm: React.FC<SectionEditorFormProps> = ({ section, onConten
                 break;
             default: return;
         }
-        onContentChange(section.id, { ...content, [key]: [...content[key], newItem] });
+        setLocalContent(prev => ({ ...prev, [key]: [...(prev as any)[key], newItem] }));
     };
 
     const handleRemoveItem = (itemId: string) => {
         const key = section.type === 'services' ? 'services' : section.type === 'gallery' ? 'images' : 'testimonials';
-        const updatedItems = content[key].filter((item: any) => item.id !== itemId);
-        onContentChange(section.id, { ...content, [key]: updatedItems });
+        const updatedItems = (localContent as any)[key].filter((item: any) => item.id !== itemId);
+        setLocalContent(prev => ({ ...prev, [key]: updatedItems }));
     };
+    
+    // Use the local `content` for rendering the form fields' values
+    const content = localContent as any;
 
     return (
         <div className="p-4 border-t border-slate-200 mt-3 bg-slate-50">
@@ -64,14 +95,14 @@ const SectionEditorForm: React.FC<SectionEditorFormProps> = ({ section, onConten
                 {'title' in content && (
                     <div>
                         <label className={baseLabel}>Section Title</label>
-                        <input type="text" value={content.title} onChange={e => onContentChange(section.id, { ...content, title: e.target.value })} className={baseInput} />
+                        <input type="text" value={content.title} onChange={e => handleFieldChange('title', e.target.value)} className={baseInput} />
                     </div>
                 )}
 
                 {section.type === 'about' && (
                     <div>
                         <label className={baseLabel}>Body</label>
-                        <textarea value={content.body} onChange={e => onContentChange(section.id, { ...content, body: e.target.value })} rows={6} className={baseInput} />
+                        <textarea value={content.body} onChange={e => handleFieldChange('body', e.target.value)} rows={6} className={baseInput} />
                     </div>
                 )}
 
@@ -131,9 +162,9 @@ const SectionEditorForm: React.FC<SectionEditorFormProps> = ({ section, onConten
 
                 {section.type === 'contact' && (
                     <div className="space-y-2">
-                        <div><label className={baseLabel}>Address</label><input type="text" value={content.address} onChange={e => onContentChange(section.id, { ...content, address: e.target.value })} className={baseInput} /></div>
-                        <div><label className={baseLabel}>Phone</label><input type="text" value={content.phone} onChange={e => onContentChange(section.id, { ...content, phone: e.target.value })} className={baseInput} /></div>
-                        <div><label className={baseLabel}>Email</label><input type="email" value={content.email} onChange={e => onContentChange(section.id, { ...content, email: e.target.value })} className={baseInput} /></div>
+                        <div><label className={baseLabel}>Address</label><input type="text" value={content.address} onChange={e => handleFieldChange('address', e.target.value)} className={baseInput} /></div>
+                        <div><label className={baseLabel}>Phone</label><input type="text" value={content.phone} onChange={e => handleFieldChange('phone', e.target.value)} className={baseInput} /></div>
+                        <div><label className={baseLabel}>Email</label><input type="email" value={content.email} onChange={e => handleFieldChange('email', e.target.value)} className={baseInput} /></div>
                     </div>
                 )}
             </div>
