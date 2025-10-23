@@ -179,4 +179,4 @@ const Preview: React.FC<PreviewProps> = ({ websiteData }) => {
   );
 };
 
-export default Preview;
+export default React.memo(Preview);

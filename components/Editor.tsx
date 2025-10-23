@@ -2,16 +2,17 @@ import React, { useState, useCallback, useEffect } from 'react';
 import type { WebsiteData, Theme, Section, SectionType } from '../types';
 import type { Session } from '../App';
 import Preview from './Preview';
-import SectionEditorForm from './SectionEditorForm';
+import EditorSectionItem from './EditorSectionItem';
 import GlobalSettingsForm from './GlobalSettingsForm';
 import { generateSectionContent } from '../services/geminiService';
 import { 
-    MagicWandIcon, LinkIcon, ClipboardCopyIcon, XIcon, PlusIcon, TrashIcon, 
-    ArrowUpIcon, ArrowDownIcon, PencilIcon, AboutIcon, ServicesIcon, GalleryIcon,
+    LinkIcon, XIcon, PlusIcon,
+    AboutIcon, ServicesIcon, GalleryIcon,
     TestimonialsIcon, ContactIcon, LogoutIcon, WarningIcon
 } from './icons';
 import { v4 as uuidv4 } from 'uuid';
 import { useNavigate } from 'react-router-dom';
+import PublishModal from './PublishModal';
 
 const SECTION_DEFAULTS = {
   about: { title: 'About Us', body: 'This is a new section about your company.' },
@@ -27,40 +28,6 @@ interface EditorProps {
   onLogout: () => void;
   session: Session;
 }
-
-const PublishModal: React.FC<{ url: string; onClose: () => void }> = ({ url, onClose }) => {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(url);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg relative" onClick={e => e.stopPropagation()}>
-        <button onClick={onClose} className="absolute top-3 right-3 text-slate-400 hover:text-slate-600">
-          <XIcon className="w-6 h-6" />
-        </button>
-        <div className="flex items-center mb-4">
-          <div className="bg-green-100 p-2 rounded-full mr-3">
-            <LinkIcon className="w-6 h-6 text-green-600" />
-          </div>
-          <h2 className="text-xl font-bold text-slate-800">Your Website is Published!</h2>
-        </div>
-        <p className="text-slate-600 mb-4">Anyone with the link can now view your site. Share it with the world!</p>
-        <div className="flex items-center space-x-2 bg-slate-100 p-3 rounded-md border border-slate-200">
-          <input type="text" readOnly value={url} className="flex-grow bg-transparent outline-none text-slate-700" />
-          <button onClick={handleCopy} className="px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-            <ClipboardCopyIcon className="w-5 h-5 inline-block mr-1"/>
-            {copied ? 'Copied!' : 'Copy'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 const AddSectionModal: React.FC<{ onAdd: (type: SectionType) => void; onClose: () => void; }> = ({ onAdd, onClose }) => {
     const availableSections: { type: SectionType, label: string, icon: React.FC<any> }[] = [
@@ -124,11 +91,11 @@ const Editor: React.FC<EditorProps> = ({ websiteData, setWebsiteData, onLogout, 
     checkKvStatus();
   }, []);
 
-  const handleThemeChange = (theme: Theme) => {
+  const handleThemeChange = useCallback((theme: Theme) => {
     setWebsiteData(prev => ({ ...prev, theme }));
-  };
+  }, [setWebsiteData]);
 
-  const handlePublish = async () => {
+  const handlePublish = useCallback(async () => {
     setIsPublishing(true);
     setError(null);
     try {
@@ -175,9 +142,9 @@ const Editor: React.FC<EditorProps> = ({ websiteData, setWebsiteData, onLogout, 
     } finally {
         setIsPublishing(false);
     }
-  };
+  }, [websiteData, session, setWebsiteData]);
 
-  const handleAddSection = (type: SectionType) => {
+  const handleAddSection = useCallback((type: SectionType) => {
     const newSection: Section = {
       id: uuidv4(),
       type: type,
@@ -186,37 +153,39 @@ const Editor: React.FC<EditorProps> = ({ websiteData, setWebsiteData, onLogout, 
     setWebsiteData(prev => ({ ...prev, sections: [...prev.sections, newSection] }));
     setShowAddSectionModal(false);
     setEditingSectionId(newSection.id);
-  };
+  }, [setWebsiteData]);
 
-  const handleRemoveSection = (sectionId: string) => {
+  const handleRemoveSection = useCallback((sectionId: string) => {
     if (window.confirm("Are you sure you want to delete this section?")) {
         setWebsiteData(prev => ({
             ...prev,
             sections: prev.sections.filter(s => s.id !== sectionId)
         }));
     }
-  }
+  }, [setWebsiteData]);
 
-  const handleMoveSection = (sectionId: string, direction: 'up' | 'down') => {
-      const index = websiteData.sections.findIndex(s => s.id === sectionId);
-      if (index === -1) return;
+  const handleMoveSection = useCallback((sectionId: string, direction: 'up' | 'down') => {
+      setWebsiteData(prev => {
+        const index = prev.sections.findIndex(s => s.id === sectionId);
+        if (index === -1) return prev;
 
-      const newIndex = direction === 'up' ? index - 1 : index + 1;
-      if (newIndex < 0 || newIndex >= websiteData.sections.length) return;
+        const newIndex = direction === 'up' ? index - 1 : index + 1;
+        if (newIndex < 0 || newIndex >= prev.sections.length) return prev;
 
-      const newSections = [...websiteData.sections];
-      const [movedSection] = newSections.splice(index, 1);
-      newSections.splice(newIndex, 0, movedSection);
-      
-      setWebsiteData(prev => ({...prev, sections: newSections}));
-  }
+        const newSections = [...prev.sections];
+        const [movedSection] = newSections.splice(index, 1);
+        newSections.splice(newIndex, 0, movedSection);
+        
+        return {...prev, sections: newSections};
+      });
+  }, [setWebsiteData]);
 
-  const handleSectionContentChange = (sectionId: string, newContent: any) => {
+  const handleSectionContentChange = useCallback((sectionId: string, newContent: any) => {
       setWebsiteData(prev => ({
           ...prev,
           sections: prev.sections.map(s => s.id === sectionId ? {...s, content: newContent} : s)
       }));
-  };
+  }, [setWebsiteData]);
 
   const handleGenerateContent = useCallback(async (section: Section) => {
     setIsGenerating(section.id);
@@ -230,8 +199,11 @@ const Editor: React.FC<EditorProps> = ({ websiteData, setWebsiteData, onLogout, 
     } finally {
         setIsGenerating(null);
     }
-  }, [websiteData]);
+  }, [websiteData, handleSectionContentChange]);
 
+  const handleToggleEdit = useCallback((sectionId: string) => {
+    setEditingSectionId(prevId => (prevId === sectionId ? null : sectionId));
+  }, []);
 
   const themes: { id: Theme; label: string; colors: string[] }[] = [
     { id: 'light', label: 'Light', colors: ['bg-white', 'bg-slate-200', 'bg-slate-800'] },
@@ -316,25 +288,19 @@ const Editor: React.FC<EditorProps> = ({ websiteData, setWebsiteData, onLogout, 
             </div>
             <div className="space-y-2">
                 {websiteData.sections.map((section, index) => (
-                   <div key={section.id} className="bg-white p-3 border border-slate-200 rounded-lg shadow-sm">
-                       <div className="flex items-center justify-between">
-                           <span className="font-medium text-slate-600 capitalize">{section.type}</span>
-                           <div className="flex items-center space-x-2">
-                               <button onClick={() => handleMoveSection(section.id, 'up')} disabled={index === 0} className="disabled:opacity-30"><ArrowUpIcon className="w-5 h-5 text-slate-500 hover:text-slate-800"/></button>
-                               <button onClick={() => handleMoveSection(section.id, 'down')} disabled={index === websiteData.sections.length - 1} className="disabled:opacity-30"><ArrowDownIcon className="w-5 h-5 text-slate-500 hover:text-slate-800"/></button>
-                               <button onClick={() => setEditingSectionId(editingSectionId === section.id ? null : section.id)}><PencilIcon className={`w-5 h-5 transition-colors ${editingSectionId === section.id ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-800'}`} /></button>
-                               <button onClick={() => handleRemoveSection(section.id)}><TrashIcon className="w-5 h-5 text-red-400 hover:text-red-600"/></button>
-                           </div>
-                       </div>
-                       {editingSectionId === section.id && (
-                           <SectionEditorForm 
-                               section={section}
-                               onContentChange={handleSectionContentChange}
-                               onGenerate={handleGenerateContent}
-                               isGenerating={isGenerating === section.id}
-                           />
-                        )}
-                   </div>
+                   <EditorSectionItem
+                        key={section.id}
+                        section={section}
+                        index={index}
+                        totalSections={websiteData.sections.length}
+                        editingSectionId={editingSectionId}
+                        isGenerating={isGenerating === section.id}
+                        onMoveSection={handleMoveSection}
+                        onRemoveSection={handleRemoveSection}
+                        onToggleEdit={handleToggleEdit}
+                        onContentChange={handleSectionContentChange}
+                        onGenerate={handleGenerateContent}
+                   />
                 ))}
             </div>
              {error && <p className="text-xs text-red-500 mt-2 p-2 bg-red-50 rounded-md border border-red-200">{error}</p>}
