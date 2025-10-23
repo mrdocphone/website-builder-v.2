@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, useNavigate, Navigate } from 'react-route
 import Editor from './components/Editor';
 import PublishedWebsite from './components/PublishedWebsite';
 import Login from './components/Login';
+import AdminDashboard from './components/AdminDashboard';
 import type { WebsiteData, Section } from './types';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -90,7 +91,7 @@ const AppContent: React.FC = () => {
             sessionStorage.setItem('isAuthenticated', 'true');
         }
         setIsAuthenticated(true);
-        navigate('/editor');
+        navigate('/admin');
     };
 
     const handleLogout = () => {
@@ -106,7 +107,7 @@ const AppContent: React.FC = () => {
           <div className="flex items-center justify-center w-screen h-screen bg-slate-100 font-sans">
             <div className="text-center">
                 <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-                <p className="mt-4 text-slate-700 text-lg">Loading Editor...</p>
+                <p className="mt-4 text-slate-700 text-lg">Loading Editor Data...</p>
             </div>
           </div>
         );
@@ -144,7 +145,7 @@ const AppContent: React.FC = () => {
                 path="/admin" 
                 element={
                     isAuthenticated ? (
-                        <Navigate to="/editor" replace />
+                        <AdminDashboard onLogout={handleLogout} />
                     ) : (
                         <Login type="admin" onLoginSuccess={handleLoginSuccess} />
                     )
@@ -160,7 +161,7 @@ const AppContent: React.FC = () => {
                 path="/" 
                 element={
                     isAuthenticated ? (
-                        <Navigate to="/editor" replace />
+                        <Navigate to="/admin" replace />
                     ) : (
                         <Navigate to="/login" replace />
                     )
