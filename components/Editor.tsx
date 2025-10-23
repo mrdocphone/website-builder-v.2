@@ -102,8 +102,13 @@ const Editor: React.FC<EditorProps> = ({ websiteData, setWebsiteData, onLogout }
         setIsCheckingKv(true);
         try {
             const response = await fetch('/api/check-kv');
-            const data = await response.json();
-            setIsKvConfigured(data.isConfigured);
+            if (response.ok) {
+                const data = await response.json();
+                setIsKvConfigured(data.isConfigured);
+            } else {
+                // Fails in environments like AI Studio where the API route doesn't exist.
+                setIsKvConfigured(false);
+            }
         } catch (e) {
             console.error("Failed to check KV status", e);
             setIsKvConfigured(false); // Assume not configured on error
