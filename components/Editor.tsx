@@ -1,11 +1,11 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import type { WebsiteData, Theme, Section, SectionType } from '../types';
 import Preview from './Preview';
 import { generateSectionContent } from '../services/geminiService';
 import { 
     MagicWandIcon, LinkIcon, ClipboardCopyIcon, XIcon, PlusIcon, TrashIcon, 
     ArrowUpIcon, ArrowDownIcon, PencilIcon, AboutIcon, ServicesIcon, GalleryIcon,
-    TestimonialsIcon, ContactIcon, LogoutIcon
+    TestimonialsIcon, ContactIcon, LogoutIcon, WarningIcon
 } from './icons';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -94,6 +94,26 @@ const Editor: React.FC<EditorProps> = ({ websiteData, setWebsiteData, onLogout }
   const [showAddSectionModal, setShowAddSectionModal] = useState(false);
   const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [isKvConfigured, setIsKvConfigured] = useState(true);
+  const [isCheckingKv, setIsCheckingKv] = useState(true);
+
+  useEffect(() => {
+    const checkKvStatus = async () => {
+        setIsCheckingKv(true);
+        try {
+            const response = await fetch('/api/check-kv');
+            const data = await response.json();
+            setIsKvConfigured(data.isConfigured);
+        } catch (e) {
+            console.error("Failed to check KV status", e);
+            setIsKvConfigured(false); // Assume not configured on error
+        } finally {
+            setIsCheckingKv(false);
+        }
+    };
+    checkKvStatus();
+  }, []);
+
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -370,8 +390,9 @@ const renderSectionForm = (section: Section) => {
           <div className="flex items-center space-x-2">
             <button
               onClick={handlePublish}
-              disabled={isPublishing}
-              className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors disabled:bg-indigo-400 disabled:cursor-wait"
+              disabled={isPublishing || !isKvConfigured || isCheckingKv}
+              className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors disabled:bg-indigo-400 disabled:cursor-not-allowed"
+              title={!isKvConfigured ? "Please configure a storage database to publish your site." : "Publish your website"}
             >
               <LinkIcon className="w-4 h-4 mr-2" />
               {isPublishing ? 'Publishing...' : 'Publish & Share'}
@@ -385,6 +406,30 @@ const renderSectionForm = (section: Section) => {
             </button>
           </div>
         </div>
+        
+        {isCheckingKv ? (
+            <div className="p-4 mb-4 text-sm text-slate-700 bg-slate-100 rounded-lg animate-pulse">Checking storage configuration...</div>
+        ) : !isKvConfigured && (
+            <div className="p-4 mb-4 text-sm bg-amber-50 border-l-4 border-amber-400 rounded-r-lg">
+                <div className="flex">
+                    <div className="flex-shrink-0">
+                         <WarningIcon className="h-5 w-5 text-amber-400" aria-hidden="true" />
+                    </div>
+                    <div className="ml-3">
+                        <h3 className="font-bold text-amber-800">Action Required: Connect a Storage Database</h3>
+                        <div className="mt-2 text-amber-700">
+                            <p className="mb-2">To publish your site, you must connect a Vercel KV store. It's a quick, one-time setup.</p>
+                            <ol className="list-decimal list-inside mt-2 space-y-1 font-medium">
+                                <li>Go to your Vercel project's <strong>Storage</strong> tab.</li>
+                                <li>Find <strong>Upstash</strong> (described as "Serverless DB") and click <strong>Create</strong>.</li>
+                                <li>Follow the prompts to connect it. You'll be asked to create a <strong>Redis Database</strong>.</li>
+                                <li>After connecting, you <strong>must Redeploy</strong> your project for the changes to take effect.</li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )}
 
         {/* Form Sections */}
         <div className="space-y-6">

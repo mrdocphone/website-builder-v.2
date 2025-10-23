@@ -123,7 +123,7 @@ const AppContent: React.FC = () => {
     const navigate = useNavigate();
     
     // Check if we're in a development/preview environment like AI Studio
-    const isDevelopment = window.location.hostname === 'localhost' || !window.location.hostname.includes('.');
+    const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname.endsWith('.aistudio.dev');
 
     const [isAuthenticated, setIsAuthenticated] = useState(() => {
         // Bypass authentication for local development/preview in AI Studio
