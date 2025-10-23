@@ -3,6 +3,7 @@ import type { WebsiteData, Theme, Section, SectionType } from '../types';
 import type { Session } from '../App';
 import Preview from './Preview';
 import SectionEditorForm from './SectionEditorForm';
+import GlobalSettingsForm from './GlobalSettingsForm';
 import { generateSectionContent } from '../services/geminiService';
 import { 
     MagicWandIcon, LinkIcon, ClipboardCopyIcon, XIcon, PlusIcon, TrashIcon, 
@@ -123,30 +124,8 @@ const Editor: React.FC<EditorProps> = ({ websiteData, setWebsiteData, onLogout, 
     checkKvStatus();
   }, []);
 
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    if (name === 'slug') {
-      const slugified = value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-      setWebsiteData(prev => ({ ...prev, slug: slugified }));
-    } else {
-      setWebsiteData(prev => ({ ...prev, [name]: value }));
-    }
-  };
-
   const handleThemeChange = (theme: Theme) => {
     setWebsiteData(prev => ({ ...prev, theme }));
-  };
-  
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setWebsiteData(prev => ({...prev, heroImageUrl: reader.result as string}));
-      }
-      reader.readAsDataURL(file);
-    }
   };
 
   const handlePublish = async () => {
@@ -325,29 +304,7 @@ const Editor: React.FC<EditorProps> = ({ websiteData, setWebsiteData, onLogout, 
         {/* Form Sections */}
         <div className="space-y-6">
           
-          {/* Business Info */}
-          <div className="p-4 border border-slate-200 rounded-lg bg-slate-50">
-            <h2 className="font-semibold text-slate-700 mb-3">Global Settings</h2>
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm font-medium text-slate-600 block mb-1">Business Name</label>
-                <input type="text" name="businessName" value={websiteData.businessName} onChange={handleInputChange} className="w-full p-2 border border-slate-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500" />
-              </div>
-              <div>
-                <label className="text-sm font-medium text-slate-600 block mb-1">Tagline</label>
-                <input type="text" name="tagline" value={websiteData.tagline} onChange={handleInputChange} className="w-full p-2 border border-slate-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500" />
-              </div>
-               <div>
-                <label className="text-sm font-medium text-slate-600 block mb-1">Website Slug</label>
-                <input type="text" name="slug" value={websiteData.slug} onChange={handleInputChange} placeholder="my-cool-business" className="w-full p-2 border border-slate-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500" />
-                <p className="text-xs text-slate-500 mt-1">Used for the shareable URL. Lowercase letters, numbers, and dashes only.</p>
-              </div>
-               <div>
-                <label className="text-sm font-medium text-slate-600 block mb-1">Hero Image</label>
-                <input type="file" accept="image/*" onChange={handleImageUpload} className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"/>
-              </div>
-            </div>
-          </div>
+          <GlobalSettingsForm websiteData={websiteData} setWebsiteData={setWebsiteData} />
           
           {/* Sections */}
           <div className="p-4 border border-slate-200 rounded-lg bg-slate-50">
