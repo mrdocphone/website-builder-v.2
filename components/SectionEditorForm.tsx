@@ -172,4 +172,4 @@ const SectionEditorForm: React.FC<SectionEditorFormProps> = ({ section, onConten
     )
 }
 
-export default SectionEditorForm;
+export default React.memo(SectionEditorForm);

@@ -91,4 +91,4 @@ const GlobalSettingsForm: React.FC<GlobalSettingsFormProps> = ({ websiteData, se
   );
 };
 
-export default GlobalSettingsForm;
+export default React.memo(GlobalSettingsForm);

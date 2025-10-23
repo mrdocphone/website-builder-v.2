@@ -44,8 +44,16 @@ const UserManagementDashboard: React.FC = () => {
                 });
 
                 if (!response.ok) {
-                    const err = await response.json();
-                    throw new Error(err.message || 'Failed to remove user.');
+                    let errorMessage = 'Failed to remove the user. The server responded with an error.';
+                    try {
+                        const err = await response.json();
+                        errorMessage = err.message || errorMessage;
+                    } catch (jsonError) {
+                        const textError = await response.text();
+                        errorMessage = textError || errorMessage;
+                        console.error("Could not parse error response as JSON:", textError);
+                    }
+                    throw new Error(errorMessage);
                 }
                 
                 // Refresh user list on success
@@ -88,9 +96,9 @@ const UserManagementDashboard: React.FC = () => {
                                         <td className="px-6 py-4 whitespace-nowrap text-slate-800">{user.name}</td>
                                         <td className="px-6 py-4 whitespace-nowrap text-slate-500 font-mono">{user.username}</td>
                                         <td className="px-6 py-4 whitespace-nowrap text-slate-500">
-                                            {new Date(user.createdAt).toLocaleDateString('en-US', {
+                                            {user.createdAt ? new Date(user.createdAt).toLocaleDateString('en-US', {
                                                 year: 'numeric', month: 'short', day: 'numeric'
-                                            })}
+                                            }) : 'N/A'}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right">
                                             <button 
