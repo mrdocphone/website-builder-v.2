@@ -1,16 +1,38 @@
-// This service has been disabled.
-// The AI content generation feature was based on a legacy data model and is no longer compatible with the application.
-import type { WebsiteData } from '../types';
+
+import type { WebsiteData, Section, Element } from '../types';
 
 /**
- * This function is part of a disabled feature. It will throw an error if called.
- * The AI content generation feature was removed because it was incompatible with the
- * current data structure and was not being used in the UI.
+ * Generates content for a given section using the Gemini API via our own backend endpoint.
+ * @param websiteData - The global website data for context.
+ * @param section - The specific section to generate content for.
+ * @returns A promise that resolves to an array of generated elements.
  */
 export const generateSectionContent = async (
   websiteData: WebsiteData,
-  section: any // The 'section' object here uses a legacy structure.
-): Promise<any> => {
-  console.warn("The 'generateSectionContent' function is part of a disabled feature and should not be called.");
-  throw new Error("The AI content generation feature has been disabled due to incompatibility with the current data structure.");
+  section: Section
+): Promise<Element[][]> => {
+  try {
+    const response = await fetch('/api/generate', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        businessName: websiteData.businessName,
+        tagline: websiteData.tagline,
+        section,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to generate content.');
+    }
+
+    const generatedElements = await response.json();
+    return generatedElements;
+  } catch (error) {
+    console.error('Error generating section content:', error);
+    throw error;
+  }
 };

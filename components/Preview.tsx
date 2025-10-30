@@ -1,8 +1,16 @@
+
 import React, { useMemo } from 'react';
-import type { WebsiteData, ThemeConfig, Theme, WebsiteNode, Element as ElementType, HeadlineElement, TextElement, ImageElement, ButtonElement } from '../types';
+import type { WebsiteData, ThemeConfig, Theme, WebsiteNode, Element as ElementType, HeadlineElement, TextElement, ImageElement, ButtonElement, Column } from '../types';
+import { PlusIcon } from './icons';
 
 interface PreviewProps {
   websiteData: WebsiteData;
+  interactive?: boolean;
+  selectedNodeId?: string | null;
+  hoveredNodeId?: string | null;
+  onSelectNode?: (id: string) => void;
+  onHoverNode?: (id: string | null) => void;
+  onAddElement?: (parentId: string, type: ElementType['type']) => void;
 }
 
 const themeConfigs: Record<Theme, ThemeConfig> = {
@@ -13,12 +21,7 @@ const themeConfigs: Record<Theme, ThemeConfig> = {
 };
 
 
-// The ElementRenderer logic has been moved here from SectionEditorForm.tsx
-// to fix a critical rendering bug and improve code co-location.
-const ElementRenderer: React.FC<{ element: ElementType }> = React.memo(({ element }) => {
-    // CRITICAL FIX: A missing, null, or non-object `content` property on an element
-    // from the database would cause a crash. This improved guard handles corrupted 
-    // data gracefully by checking the type.
+const ElementRenderer: React.FC<{ element: ElementType, theme: ThemeConfig }> = React.memo(({ element, theme }) => {
     if (!element.content || typeof element.content !== 'object') {
         return null;
     }
@@ -26,45 +29,25 @@ const ElementRenderer: React.FC<{ element: ElementType }> = React.memo(({ elemen
     switch (element.type) {
         case 'headline': {
             const { level, text } = element.content as HeadlineElement['content'];
-            // FIX: Add validation for the 'level' property. If it's missing or invalid,
-            // default to 'h2' to prevent a rendering crash.
             const Tag = (level && ['h1', 'h2', 'h3'].includes(level)) ? level : 'h2';
-            return (
-                <Tag>
-                    {text}
-                </Tag>
-            );
+            const sizeClasses = { h1: 'text-4xl font-bold', h2: 'text-3xl font-bold', h3: 'text-2xl font-semibold' };
+            return ( <Tag className={sizeClasses[Tag]}>{text}</Tag> );
         }
         case 'text': {
             const { text } = element.content as TextElement['content'];
-            return (
-                <p className="whitespace-pre-wrap">
-                    {text}
-                </p>
-            );
+            return ( <p className="whitespace-pre-wrap leading-relaxed">{text}</p> );
         }
         case 'image': {
             const { src, alt } = element.content as ImageElement['content'];
-            // An image without a source URL is invalid and should not be rendered.
-            if (!src) {
-                return null;
-            }
-            return <img src={src} alt={alt || ''} className="max-w-full h-auto" />;
+            if (!src) { return null; }
+            return <img src={src} alt={alt || ''} className="max-w-full h-auto rounded-md" />;
         }
         case 'button': {
             const { text, href } = element.content as ButtonElement['content'];
-            // A button without text or a link is invalid and should not be rendered.
-            if (!text || !href) {
-                return null;
-            }
+            if (!text || !href) { return null; }
             return (
-                <a 
-                    href={href} 
-                    className="inline-block bg-indigo-600 text-white px-6 py-3 rounded-md no-underline"
-                >
-                    <span>
-                        {text}
-                    </span>
+                <a href={href} className={`inline-block ${theme.primary} ${theme.primaryText} px-6 py-3 rounded-md font-semibold no-underline`}>
+                    <span>{text}</span>
                 </a>
             );
         }
@@ -74,25 +57,72 @@ const ElementRenderer: React.FC<{ element: ElementType }> = React.memo(({ elemen
 });
 
 
-const NodeRenderer: React.FC<{ node: WebsiteNode }> = ({ node }) => {
-    // CRITICAL FIX: Add comprehensive checks to prevent rendering crashes from corrupted data.
-    // A node must have an id and type to be valid.
+const InteractiveWrapper: React.FC<React.PropsWithChildren<{
+    node: WebsiteNode;
+    interactive?: boolean;
+    isSelected?: boolean;
+    isHovered?: boolean;
+    onSelect?: (id: string) => void;
+    onHover?: (id: string | null) => void;
+}>> = ({ children, node, interactive, isSelected, isHovered, onSelect, onHover }) => {
+    if (!interactive) {
+        return <>{children}</>;
+    }
+
+    const handleClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        onSelect?.(node.id);
+    };
+
+    const handleMouseEnter = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        onHover?.(node.id);
+    };
+
+    const handleMouseLeave = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        onHover?.(null);
+    };
+
+    const wrapperClasses = [
+        'interactive-wrapper',
+        isSelected ? 'selected' : '',
+        isHovered ? 'hovered' : ''
+    ].join(' ').trim();
+
+    return (
+        <div
+            className={wrapperClasses}
+            onClick={handleClick}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+        >
+            {children}
+        </div>
+    );
+};
+
+const NodeRenderer: React.FC<Omit<PreviewProps, 'websiteData'> & { node: WebsiteNode, theme: ThemeConfig }> = (props) => {
+    const { node, theme } = props;
+
     if (!node || !node.id || !node.type) {
-        console.warn('Skipping rendering of invalid or corrupted node:', node);
+        console.warn('Skipping rendering of invalid node:', node);
         return null;
     }
     
-    // Base case: render an element (leaf node).
+    const isSelected = props.interactive && props.selectedNodeId === node.id;
+    const isHovered = props.interactive && props.hoveredNodeId === node.id && !isSelected;
+
     if (!('children' in node) || !Array.isArray(node.children)) {
       return (
-        // Ensure styles is an object to prevent crashes.
-        <div style={node.styles || {}}>
-          <ElementRenderer element={node as ElementType} />
-        </div>
+        <InteractiveWrapper {...props} node={node} isSelected={isSelected} isHovered={isHovered}>
+            <div style={node.styles || {}}>
+                <ElementRenderer element={node as ElementType} theme={theme} />
+            </div>
+        </InteractiveWrapper>
       );
     }
   
-    // Recursive case: render a layout container (branch node).
     let className = '';
     let Tag: React.ElementType = 'div';
     
@@ -102,44 +132,52 @@ const NodeRenderer: React.FC<{ node: WebsiteNode }> = ({ node }) => {
             className = 'py-8 px-4 md:py-12 md:px-6';
             break;
         case 'row':
-            className = 'flex flex-wrap -mx-2';
+            className = 'flex flex-wrap -mx-4';
             break;
         case 'column':
-            className = 'flex-1 p-2';
+            className = 'w-full md:w-1/2 p-4 flex flex-col gap-4';
+             if ((node as Column).children.length === 0 && props.interactive) {
+                return (
+                    <div className={className}>
+                        <div className="empty-column-placeholder">
+                             <button onClick={() => props.onAddElement?.(node.id, 'headline')} className="bg-slate-200 text-slate-600 px-4 py-2 rounded-md text-sm hover:bg-slate-300">
+                                <PlusIcon className="w-4 h-4 inline-block mr-2" />
+                                Add Element
+                            </button>
+                        </div>
+                    </div>
+                );
+            }
             break;
         default:
-             // Handle unknown types gracefully instead of crashing.
-            // FIX: The switch is exhaustive, so `node` is `never` here. Cast to `any` to access `type` for logging.
-            console.warn(`Encountered unknown node type: "${(node as any).type}". Rendering as a generic container.`);
+            console.warn(`Encountered unknown node type: "${(node as any).type}".`);
             break;
     }
 
     return (
-        // Ensure styles is an object to prevent crashes.
-        <Tag className={className} style={node.styles || {}}>
-            {node.children
-                // Filter out any child that is falsey or missing an ID. This is crucial 
-                // to prevent React key errors and rendering crashes from corrupted data.
-                .filter(child => child && child.id)
-                .map(child => (
-                    <NodeRenderer key={child.id} node={child} />
-                ))
-            }
-        </Tag>
+        <InteractiveWrapper {...props} node={node} isSelected={isSelected} isHovered={isHovered}>
+            <Tag className={className} style={node.styles || {}}>
+                {node.children
+                    .filter(child => child && child.id)
+                    .map(child => (
+                        <NodeRenderer key={child.id} {...props} node={child} />
+                    ))
+                }
+            </Tag>
+        </InteractiveWrapper>
     );
 };
 
-const Preview: React.FC<PreviewProps> = ({ websiteData }) => {
+const Preview: React.FC<PreviewProps> = (props) => {
+  const { websiteData } = props;
   const theme = useMemo(() => themeConfigs[websiteData.theme] || themeConfigs.light, [websiteData.theme]);
 
   return (
     <div className={`w-full h-full overflow-y-auto ${theme.bg} ${theme.text} transition-colors duration-300`}>
-      {/* Header */}
       <header className={`p-6 sticky top-0 ${theme.bg} bg-opacity-80 backdrop-blur-sm z-20`}>
         <h1 className={`text-2xl font-bold ${theme.headerText}`}>{websiteData.businessName}</h1>
       </header>
 
-      {/* Hero Section */}
       <section className="relative h-72">
         <img src={websiteData.heroImageUrl} alt={`${websiteData.businessName} hero image`} className="w-full h-full object-cover" />
         <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center p-6">
@@ -150,14 +188,12 @@ const Preview: React.FC<PreviewProps> = ({ websiteData }) => {
         </div>
       </section>
 
-      {/* Dynamic Sections */}
       <main>
         {websiteData.children && websiteData.children.filter(Boolean).map(section => (
-            <NodeRenderer key={section.id} node={section} />
+            <NodeRenderer key={section.id} {...props} node={section} theme={theme} />
         ))}
       </main>
 
-      {/* Footer */}
       <footer className={`py-6 px-6 text-center ${theme.footerBg} ${theme.footerText}`}>
         <p>&copy; {new Date().getFullYear()} {websiteData.businessName}. All rights reserved.</p>
       </footer>
