@@ -1,4 +1,3 @@
-
 import { v4 as uuidv4 } from 'uuid';
 import type { WebsiteNode, Section, Row, Column, Element } from '../types';
 import { produce } from 'immer';
@@ -32,7 +31,9 @@ export function updateNodeById(nodes: WebsiteNode[], id: string, updates: Partia
                 updatedNode.styles = { ...node.styles, ...updates.styles };
             }
 
-            if (updates.content && 'content' in node && node.content) {
+            // FIX: Use the 'in' operator to safely check for the 'content' property on the 'updates' object.
+            // This acts as a type guard, allowing TypeScript to correctly narrow the union type before access.
+            if ('content' in updates && updates.content && 'content' in node && node.content) {
                 (updatedNode as any).content = { ...node.content, ...updates.content };
             }
             

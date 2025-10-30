@@ -1,7 +1,6 @@
 // Vercel Serverless Function
 // This function retrieves website data from Vercel KV by its slug.
 import { kv } from '@vercel/kv';
-import type { WebsiteData } from '../types';
 
 export const config = {
   runtime: 'edge',
@@ -27,7 +26,22 @@ export default async function handler(request: Request) {
     }
 
     const key = `site:${slugParam.replace('/', ':')}`;
-    const websiteData = await kv.get<WebsiteData>(key);
+    const rawData = await kv.get(key);
+    
+    let websiteData = null;
+
+    if (typeof rawData === 'string') {
+        try {
+            websiteData = JSON.parse(rawData);
+        } catch (e) {
+            console.error(`Failed to parse JSON for key ${key}:`, rawData);
+            // Treat unparseable strings as if the data wasn't found.
+            websiteData = null; 
+        }
+    } else if (typeof rawData === 'object' && rawData !== null) {
+        // Data might already be a parsed object.
+        websiteData = rawData;
+    }
 
     if (websiteData) {
         return new Response(JSON.stringify(websiteData), { 
