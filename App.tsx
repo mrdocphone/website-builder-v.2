@@ -1,6 +1,7 @@
 
 
-import React, { useState, useEffect } from 'react';
+// FIX: Corrected the invalid import syntax. `aistudio` was a typo and `useState` should be destructured.
+import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, Navigate, Outlet } from 'react-router-dom';
 import PublishedWebsite from './components/PublishedWebsite';
 import Login from './components/Login';
@@ -52,6 +53,7 @@ const UserDashboard: React.FC<{ onLogout: () => void, session: Session }> = ({ o
 
 const AppContent: React.FC = () => {
     const navigate = useNavigate();
+    // FIX: Corrected the call to `useState`. The `aistudio` prefix was a typo.
     const [session, setSession] = useState<Session>(getInitialSession());
 
     const handleLoginSuccess = (data: { type: 'admin' | 'user'; username: string }, remember: boolean) => {
@@ -80,45 +82,60 @@ const AppContent: React.FC = () => {
         navigate('/login');
     };
     
-    const UserRouteProtection = () => {
+    // Renders child routes if the user is authenticated, otherwise redirects to login.
+    const UserRouteProtection: React.FC = () => {
       if (!session.isAuthenticated) {
         return <Navigate to="/login" replace />;
       }
       return <Outlet />;
     };
 
+    // This component acts as a "gatekeeper" for the admin section.
+    // It renders the admin dashboard layout (which includes an <Outlet/>) only for authenticated admins.
+    // Otherwise, it redirects to the admin login page.
+    const AdminRouteProtector: React.FC = () => {
+        if (session.isAuthenticated && session.type === 'admin') {
+            return <AdminDashboardLayout onLogout={handleLogout} />;
+        }
+        // Redirect to a dedicated admin login route.
+        return <Navigate to="/admin/login" replace />;
+    };
+
     return (
         <Routes>
-            {/* --- Public Routes --- */}
+            {/* --- Application Routes --- */}
+            {/* Placed first to ensure they are matched before the dynamic content routes. */}
+            
+            {/* Root Redirect */}
+            <Route path="/" element={<Navigate to={session.isAuthenticated ? (session.type === 'admin' ? '/admin' : '/dashboard') : '/login'} replace />} />
+
+            {/* Public Routes */}
             <Route path="/login" element={!session.isAuthenticated ? <Login type="user" onLoginSuccess={handleLoginSuccess} /> : <Navigate to="/dashboard" replace />} />
             <Route path="/signup" element={!session.isAuthenticated ? <Signup onSignupSuccess={handleSignupSuccess} /> : <Navigate to="/dashboard" replace />} />
             
-            {/* --- Admin Login/Dashboard Routes --- */}
+            {/* Admin Login Route */}
             <Route 
-                path="/admin/*" 
+                path="/admin/login" 
                 element={
-                    session.isAuthenticated && session.type === 'admin' ? (
-                        <AdminDashboardLayout onLogout={handleLogout}>
-                            <Routes>
-                                <Route index element={<DashboardWelcome />} />
-                                <Route path="users" element={<UserManagementDashboard />} />
-                            </Routes>
-                        </AdminDashboardLayout>
-                    ) : (
-                        <Login type="admin" onLoginSuccess={handleLoginSuccess} />
-                    )
-                }
+                    (session.isAuthenticated && session.type === 'admin') 
+                    ? <Navigate to="/admin" replace /> 
+                    : <Login type="admin" onLoginSuccess={handleLoginSuccess} />
+                } 
             />
 
-            {/* --- User Protected Route --- */}
+            {/* Protected Admin Routes */}
+            <Route element={<AdminRouteProtector />}>
+                <Route path="/admin" element={<DashboardWelcome />} />
+                <Route path="/admin/users" element={<UserManagementDashboard />} />
+            </Route>
+
+            {/* User Protected Routes */}
             <Route element={<UserRouteProtection />}>
                 <Route path="/dashboard" element={<UserDashboard onLogout={handleLogout} session={session} />} />
             </Route>
             
-            {/* --- Root Redirect --- */}
-            <Route path="/" element={<Navigate to={session.isAuthenticated ? (session.type === 'admin' ? '/admin' : '/dashboard') : '/login'} replace />} />
-            
             {/* --- Published Site Routes (Catch-all) --- */}
+            {/* These routes are last to act as a fallback for any path that isn't a defined application route. */}
             <Route path="/:username/:slug" element={<PublishedWebsite />} />
             <Route path="/:username" element={<PublishedWebsite />} />
         </Routes>

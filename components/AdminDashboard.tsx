@@ -1,13 +1,14 @@
+
 import React from 'react';
-import { NavLink, Routes, Route } from 'react-router-dom';
-import { LogoutIcon, PencilIcon, UsersIcon, HomeIcon } from './icons';
+import { NavLink, Outlet } from 'react-router-dom';
+import { LogoutIcon, UsersIcon, HomeIcon } from './icons';
+
 
 interface AdminDashboardLayoutProps {
   onLogout: () => void;
-  children: React.ReactNode;
 }
 
-const AdminDashboardLayout: React.FC<AdminDashboardLayoutProps> = ({ onLogout, children }) => {
+const AdminDashboardLayout: React.FC<AdminDashboardLayoutProps> = ({ onLogout }) => {
   
   const navItems = [
     { to: '/admin', text: 'Dashboard', icon: HomeIcon },
@@ -49,7 +50,7 @@ const AdminDashboardLayout: React.FC<AdminDashboardLayoutProps> = ({ onLogout, c
 
       {/* Main Content Area */}
       <main className="flex-1 overflow-y-auto">
-        {children}
+        <Outlet />
       </main>
     </div>
   );
