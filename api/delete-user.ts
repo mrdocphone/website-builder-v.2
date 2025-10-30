@@ -18,14 +18,20 @@ export default async function handler(request: Request) {
             return new Response(JSON.stringify({ message: 'Username is required.' }), { status: 400 });
         }
         
-        // Find all published sites for the user
-        const siteKeys: string[] = [];
+        // Find all published sub-pages for the user (e.g., site:user:about)
+        const subPageKeys: string[] = [];
         let cursor = 0;
         do {
+            // The match pattern finds all keys that start with "site:username:"
             const [nextCursor, keys] = await kv.scan(cursor, { match: `site:${username}:*` });
             cursor = nextCursor;
-            siteKeys.push(...keys);
+            subPageKeys.push(...keys);
         } while (cursor !== 0);
+
+        // Also target the user's main page key (e.g., site:user)
+        const mainPageKey = `site:${username}`;
+        const allSiteKeysToDelete = [...subPageKeys, mainPageKey];
+
 
         // Prepare deletion pipeline
         const pipeline = kv.pipeline();
@@ -39,9 +45,9 @@ export default async function handler(request: Request) {
         // 3. Remove user from the master user list
         pipeline.srem('users', username);
 
-        // 4. Delete all of the user's published sites
-        if (siteKeys.length > 0) {
-           pipeline.del(...siteKeys);
+        // 4. Delete all of the user's published sites if any keys were found
+        if (allSiteKeysToDelete.length > 0) {
+           pipeline.del(...allSiteKeysToDelete);
         }
 
         // Execute all deletions in a single transaction
