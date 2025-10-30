@@ -28,7 +28,7 @@ export default async function handler(request: Request) {
     const key = `site:${slugParam.replace('/', ':')}`;
     const rawData = await kv.get(key);
     
-    let websiteData = null;
+    let websiteData: any = null;
 
     if (typeof rawData === 'string') {
         try {
@@ -43,12 +43,14 @@ export default async function handler(request: Request) {
         websiteData = rawData;
     }
 
-    if (websiteData) {
+    // Server-side validation to ensure the data has the minimum required structure.
+    if (websiteData && typeof websiteData === 'object' && websiteData.businessName && Array.isArray(websiteData.children)) {
         return new Response(JSON.stringify(websiteData), { 
             status: 200, 
             headers: { 'Content-Type': 'application/json' } 
         });
     } else {
+        // If data is missing, malformed, or doesn't match our structure, treat it as not found.
         return new Response(JSON.stringify({ message: 'Site not found.' }), { 
             status: 404, 
             headers: { 'Content-Type': 'application/json' } 

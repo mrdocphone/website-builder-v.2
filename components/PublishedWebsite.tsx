@@ -29,14 +29,11 @@ const PublishedWebsite: React.FC = () => {
 
             const parsedData = await response.json();
             
-            // Removed the complex backwards compatibility logic to improve stability.
-            // Published sites will now only render using the modern, stable data format.
-            if (parsedData.businessName && Array.isArray(parsedData.children)) {
-                setWebsiteData(parsedData);
-                document.title = parsedData.businessName;
-            } else {
-                throw new Error("The website data appears to be corrupted or in an old format.");
-            }
+            // The data is now validated on the server-side.
+            // If we receive a 200 OK, we can assume the data format is correct.
+            setWebsiteData(parsedData);
+            document.title = parsedData.businessName;
+
         } catch (e) {
             setError(e instanceof Error ? e.message : "An unknown error occurred.");
             console.error("Failed to load website data", e);
