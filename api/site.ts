@@ -16,16 +16,19 @@ export default async function handler(request: Request) {
 
   try {
     const { searchParams } = new URL(request.url);
-    const slugParam = searchParams.get('slug');
+    const username = searchParams.get('username');
+    const slug = searchParams.get('slug'); // This will be null if not present
 
-    if (!slugParam) {
-        return new Response(JSON.stringify({ message: 'Slug is required.' }), { 
+    if (!username) {
+        return new Response(JSON.stringify({ message: 'Username is required.' }), { 
             status: 400, 
             headers: { 'Content-Type': 'application/json' } 
         });
     }
 
-    const key = `site:${slugParam.replace('/', ':')}`;
+    // If a slug is provided, fetch a specific sub-page (e.g., site:user:about).
+    // If no slug is provided (slug is null), fetch the user's main page (e.g., site:user).
+    const key = slug ? `site:${username}:${slug}` : `site:${username}`;
     const rawData = await kv.get(key);
     
     let websiteData: any = null;

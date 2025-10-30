@@ -11,13 +11,23 @@ const PublishedWebsite: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const slugToFetch = slug ? `${username}/${slug}` : username;
-
     const fetchWebsiteData = async () => {
+        if (!username) {
+            setError("Username not found in URL.");
+            setIsLoading(false);
+            return;
+        }
+
         setIsLoading(true);
         setError(null);
+        
+        const queryParams = new URLSearchParams({ username });
+        if (slug) {
+            queryParams.append('slug', slug);
+        }
+
         try {
-            const response = await fetch(`/api/site?slug=${slugToFetch}`);
+            const response = await fetch(`/api/site?${queryParams.toString()}`);
 
             if (response.status === 404) {
                 throw new Error("We couldn't find a website at this address. Please check the URL.");
