@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import type { WebsiteData, ThemeConfig, Theme, WebsiteNode, Element as ElementType } from '../types';
-import Element from './SectionEditorForm'; // Repurposed as Element renderer
+import ElementRenderer from './SectionEditorForm'; // Repurposed as Element renderer
 
 interface PreviewProps {
   websiteData: WebsiteData;
@@ -13,22 +13,62 @@ const themeConfigs: Record<Theme, ThemeConfig> = {
   forest: { bg: 'bg-green-50', text: 'text-green-900', primary: 'bg-green-700', primaryText: 'text-white', secondary: 'bg-green-100', footerBg: 'bg-green-900', footerText: 'text-green-100', headerText: 'text-green-900' },
 };
 
+const NodeRenderer: React.FC<{ node: WebsiteNode }> = ({ node }) => {
+    // CRITICAL FIX: Add comprehensive checks to prevent rendering crashes from corrupted data.
+    // A node must have an id and type to be valid.
+    if (!node || !node.id || !node.type) {
+        console.warn('Skipping rendering of invalid or corrupted node:', node);
+        return null;
+    }
+    
+    // Base case: render an element (leaf node).
+    if (!('children' in node) || !Array.isArray(node.children)) {
+      return (
+        // Ensure styles is an object to prevent crashes.
+        <div style={node.styles || {}}>
+          <ElementRenderer element={node as ElementType} />
+        </div>
+      );
+    }
+  
+    // Recursive case: render a layout container (branch node).
+    let className = '';
+    let Tag: React.ElementType = 'div';
+    
+    switch(node.type) {
+        case 'section':
+            Tag = 'section';
+            className = 'py-8 px-4 md:py-12 md:px-6';
+            break;
+        case 'row':
+            className = 'flex flex-wrap -mx-2';
+            break;
+        case 'column':
+            className = 'flex-1 p-2';
+            break;
+        default:
+             // Handle unknown types gracefully instead of crashing.
+            console.warn(`Encountered unknown node type: "${node.type}". Rendering as a generic container.`);
+            break;
+    }
+
+    return (
+        // Ensure styles is an object to prevent crashes.
+        <Tag className={className} style={node.styles || {}}>
+            {node.children
+                // Filter out any child that is falsey or missing an ID. This is crucial 
+                // to prevent React key errors and rendering crashes from corrupted data.
+                .filter(child => child && child.id)
+                .map(child => (
+                    <NodeRenderer key={child.id} node={child} />
+                ))
+            }
+        </Tag>
+    );
+};
+
 const Preview: React.FC<PreviewProps> = ({ websiteData }) => {
   const theme = useMemo(() => themeConfigs[websiteData.theme] || themeConfigs.light, [websiteData.theme]);
-
-  const renderNode = (node: WebsiteNode): React.ReactNode => {
-    return (
-       <div style={node.styles}>
-        {'children' in node && Array.isArray(node.children) ? (
-          <div className={node.type === 'row' ? 'flex' : ''}>
-            {node.children.filter(Boolean).map(child => <div key={child.id} className={child.type === 'column' ? 'flex-1' : ''}>{renderNode(child)}</div>)}
-          </div>
-        ) : (
-          <Element element={node as ElementType} />
-        )}
-      </div>
-    );
-  };
 
   return (
     <div className={`w-full h-full overflow-y-auto ${theme.bg} ${theme.text} transition-colors duration-300`}>
@@ -51,7 +91,7 @@ const Preview: React.FC<PreviewProps> = ({ websiteData }) => {
       {/* Dynamic Sections */}
       <main>
         {websiteData.children && websiteData.children.filter(Boolean).map(section => (
-          <div key={section.id}>{renderNode(section)}</div>
+            <NodeRenderer key={section.id} node={section} />
         ))}
       </main>
 

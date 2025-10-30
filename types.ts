@@ -15,7 +15,6 @@ export interface Styles {
   fontSize?: string;
   textAlign?: 'left' | 'center' | 'right' | 'justify';
   fontWeight?: 'normal' | 'bold';
-  // FIX: Add fontStyle property to fix type error on App.tsx line 88.
   fontStyle?: 'normal' | 'italic' | 'oblique';
   // Background
   backgroundColor?: string;

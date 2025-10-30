@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import type { WebsiteData, Element, Row, Column } from '../types';
+import type { WebsiteData } from '../types';
 import Preview from './Preview';
-import { v4 as uuidv4 } from 'uuid';
 
 
 const PublishedWebsite: React.FC = () => {
