@@ -25,8 +25,13 @@ export default async function handler(request: Request) {
         // Save the specific page
         await kv.set(key, JSON.stringify(websiteData));
 
-        // If the slug is 'home' or the first page, also save it to the root path for the user
-        if (websiteData.slug === 'home') {
+        // Check if a main page already exists for this user.
+        // We use kv.exists which is more efficient than kv.get for this check.
+        const mainPageExists = await kv.exists(mainKey);
+
+        // If the current page's slug is 'home', it always becomes the main page.
+        // If no main page exists yet, this publication becomes the main page by default.
+        if (websiteData.slug === 'home' || !mainPageExists) {
             await kv.set(mainKey, JSON.stringify(websiteData));
         }
 
