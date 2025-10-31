@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import type { WebsiteData } from '../types';
@@ -42,7 +43,7 @@ const PublishedWebsite: React.FC = () => {
             // The data is now validated on the server-side.
             // If we receive a 200 OK, we can assume the data format is correct.
             setWebsiteData(parsedData);
-            document.title = parsedData.name;
+            
 
         } catch (e) {
             setError(e instanceof Error ? e.message : "An unknown error occurred.");
@@ -55,6 +56,32 @@ const PublishedWebsite: React.FC = () => {
     fetchWebsiteData();
 
   }, [username, slug]);
+  
+  useEffect(() => {
+    if (websiteData) {
+        // Set Title
+        document.title = websiteData.metaTitle || websiteData.name;
+
+        // Set Meta Description
+        let metaDescription = document.querySelector('meta[name="description"]');
+        if (!metaDescription) {
+            metaDescription = document.createElement('meta');
+            metaDescription.setAttribute('name', 'description');
+            document.head.appendChild(metaDescription);
+        }
+        metaDescription.setAttribute('content', websiteData.metaDescription || websiteData.tagline || '');
+
+        // Set Favicon
+        let favicon = document.querySelector('link[rel="icon"]');
+        if (!favicon) {
+            favicon = document.createElement('link');
+            favicon.setAttribute('rel', 'icon');
+            document.head.appendChild(favicon);
+        }
+        favicon.setAttribute('href', websiteData.faviconUrl || '/favicon.ico');
+    }
+  }, [websiteData]);
+
 
   if (isLoading) {
     return (

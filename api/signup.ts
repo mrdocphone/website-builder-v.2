@@ -1,3 +1,4 @@
+
 import { kv } from '@vercel/kv';
 import { v4 as uuidv4 } from 'uuid';
 import type { WebsiteData, Section, ResponsiveStyles } from '../types';
@@ -27,6 +28,9 @@ const createDefaultWebsite = (id: string, name: string): WebsiteData => ({
   tagline: 'Your amazing tagline here!',
   theme: 'light',
   heroImageUrl: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?q=80&w=2071&auto=format&fit=crop',
+  metaTitle: name,
+  metaDescription: 'A website created with Gen-Z Builder.',
+  faviconUrl: '/favicon.ico',
   palette: {
       primary: '#4f46e5',
       secondary: '#f1f5f9',

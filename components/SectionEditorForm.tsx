@@ -1,10 +1,10 @@
+
 import React, { useState } from 'react';
 import type { WebsiteNode, Device, StyleProperties, Element, IconElement, WebsiteData, FormElement, EmbedElement } from '../types';
-import { availableIcons, IconRenderer } from './icons';
+import { availableIcons, IconRenderer, DesktopIcon, TabletIcon, MobileIcon } from './icons';
 
 interface StylePanelProps {
   node: WebsiteNode;
-  device: Device;
   websiteData: WebsiteData;
   onUpdate: (id: string, updates: Partial<WebsiteNode>) => void;
 }
@@ -15,9 +15,13 @@ const StyleInput: React.FC<{
     onChange: (value: any) => void;
     type?: string;
     options?: { value: string, label: string }[];
-}> = ({ label, value, onChange, type = 'text', options }) => (
+    isInherited?: boolean;
+}> = ({ label, value, onChange, type = 'text', options, isInherited = false }) => (
     <div className="flex items-center justify-between mb-2">
-        <label className="text-sm text-slate-500 block">{label}</label>
+        <label className="text-sm text-slate-500 block flex items-center">
+             {isInherited && <span className="w-1.5 h-1.5 bg-blue-400 rounded-full mr-2" title="Inherited value"></span>}
+            {label}
+        </label>
         {type === 'select' ? (
             <select value={value || ''} onChange={e => onChange(e.target.value)} className="w-1/2 p-1 border rounded text-sm bg-white">
                 {options?.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
@@ -33,10 +37,14 @@ const ColorPicker: React.FC<{
     value: string | undefined;
     onChange: (value: string) => void;
     palette: WebsiteData['palette'];
-}> = ({ label, value, onChange, palette }) => (
+    isInherited?: boolean;
+}> = ({ label, value, onChange, palette, isInherited }) => (
     <div>
         <div className="flex items-center justify-between mb-2">
-            <label className="text-sm text-slate-500 block">{label}</label>
+            <label className="text-sm text-slate-500 block flex items-center">
+                 {isInherited && <span className="w-1.5 h-1.5 bg-blue-400 rounded-full mr-2" title="Inherited value"></span>}
+                 {label}
+            </label>
             <input type="color" value={value || '#000000'} onChange={e => onChange(e.target.value)} className="w-1/2 p-1 h-8 border rounded text-sm" />
         </div>
         <div className="global-color-swatches">
@@ -108,13 +116,14 @@ const BackgroundPanel: React.FC<{
     )
 }
 
-const StylePanel: React.FC<StylePanelProps> = ({ node, device, websiteData, onUpdate }) => {
+const StylePanel: React.FC<StylePanelProps> = ({ node, websiteData, onUpdate }) => {
+    const [editingDevice, setEditingDevice] = useState<Device>('desktop');
     
     const handleStyleChange = (prop: keyof StyleProperties, value: any) => {
         const newStyles = {
             ...node.styles,
-            [device]: {
-                ...node.styles[device],
+            [editingDevice]: {
+                ...node.styles[editingDevice],
                 [prop]: value,
             }
         };
@@ -125,8 +134,33 @@ const StylePanel: React.FC<StylePanelProps> = ({ node, device, websiteData, onUp
         onUpdate(node.id, { content: { ...(node as any).content, [field]: value } });
     };
 
-    const currentStyles = node.styles[device] || {};
+    const getInheritedStyleValue = (prop: keyof StyleProperties) => {
+        if (editingDevice === 'desktop') {
+            return node.styles.desktop?.[prop];
+        }
+        if (editingDevice === 'tablet') {
+            return node.styles.tablet?.[prop] ?? node.styles.desktop?.[prop];
+        }
+        // mobile
+        return node.styles.mobile?.[prop] ?? node.styles.tablet?.[prop] ?? node.styles.desktop?.[prop];
+    };
+
+    const isInherited = (prop: keyof StyleProperties) => {
+        return node.styles[editingDevice]?.[prop] === undefined;
+    }
+
+    const currentStylesForEditing = new Proxy(node.styles[editingDevice] || {}, {
+        get: (_, prop: keyof StyleProperties) => getInheritedStyleValue(prop)
+    });
+
     const content = (node as any).content || {};
+    
+    const deviceOptions: { id: Device; icon: React.FC<any> }[] = [
+        { id: 'desktop', icon: DesktopIcon },
+        { id: 'tablet', icon: TabletIcon },
+        { id: 'mobile', icon: MobileIcon },
+    ];
+
 
     const renderContentFields = () => {
         switch (node.type) {
@@ -170,45 +204,56 @@ const StylePanel: React.FC<StylePanelProps> = ({ node, device, websiteData, onUp
 
     return (
         <div>
-            <div className="p-4 border-b">
+            <div className="p-4 border-b space-y-3">
                 <h3 className="font-bold text-lg capitalize">{node.type}</h3>
-                <p className="text-sm text-slate-500">Editing for <span className="font-semibold capitalize">{device}</span> view</p>
+                <div className="flex items-center justify-center gap-2 p-1 bg-slate-100 rounded-md">
+                   {deviceOptions.map(({ id, icon: Icon }) => (
+                    <button
+                        key={id}
+                        onClick={() => setEditingDevice(id)}
+                        className={`flex-1 py-1.5 px-2 rounded text-sm flex items-center justify-center gap-2 ${editingDevice === id ? 'bg-white shadow' : 'text-slate-500 hover:bg-slate-200'}`}
+                        title={`Edit for ${id}`}
+                    >
+                        <Icon className="w-5 h-5" />
+                    </button>
+                    ))}
+                </div>
             </div>
             
              <div className="space-y-px">
                 {isContainer &&
                     <Accordion title="Layout">
-                        <StyleInput label="Direction" value={currentStyles.flexDirection} onChange={val => handleStyleChange('flexDirection', val)} type="select" options={[{value: 'row', label: 'Row'}, {value: 'column', label: 'Column'}]} />
-                        <StyleInput label="Justify" value={currentStyles.justifyContent} onChange={val => handleStyleChange('justifyContent', val)} type="select" options={[{value: 'flex-start', label: 'Start'}, {value: 'center', label: 'Center'}, {value: 'flex-end', label: 'End'}, {value: 'space-between', label: 'Space Between'}]} />
-                        <StyleInput label="Align" value={currentStyles.alignItems} onChange={val => handleStyleChange('alignItems', val)} type="select" options={[{value: 'flex-start', label: 'Start'}, {value: 'center', label: 'Center'}, {value: 'flex-end', label: 'End'}, {value: 'stretch', label: 'Stretch'}]} />
-                        <StyleInput label="Gap" value={currentStyles.gap} onChange={val => handleStyleChange('gap', val)} />
+                        <StyleInput label="Direction" value={currentStylesForEditing.flexDirection} onChange={val => handleStyleChange('flexDirection', val)} type="select" options={[{value: 'row', label: 'Row'}, {value: 'column', label: 'Column'}]} isInherited={isInherited('flexDirection')}/>
+                        <StyleInput label="Justify" value={currentStylesForEditing.justifyContent} onChange={val => handleStyleChange('justifyContent', val)} type="select" options={[{value: 'flex-start', label: 'Start'}, {value: 'center', label: 'Center'}, {value: 'flex-end', label: 'End'}, {value: 'space-between', label: 'Space Between'}]} isInherited={isInherited('justifyContent')}/>
+                        <StyleInput label="Align" value={currentStylesForEditing.alignItems} onChange={val => handleStyleChange('alignItems', val)} type="select" options={[{value: 'flex-start', label: 'Start'}, {value: 'center', label: 'Center'}, {value: 'flex-end', label: 'End'}, {value: 'stretch', label: 'Stretch'}]} isInherited={isInherited('alignItems')}/>
+                        <StyleInput label="Gap" value={currentStylesForEditing.gap} onChange={val => handleStyleChange('gap', val)} isInherited={isInherited('gap')}/>
                     </Accordion>
                 }
                  <Accordion title="Content">
                     {renderContentFields()}
                 </Accordion>
                 <Accordion title="Spacing">
-                    <StyleInput label="Margin Top" value={currentStyles.marginTop} onChange={val => handleStyleChange('marginTop', val)} />
-                    <StyleInput label="Margin Bottom" value={currentStyles.marginBottom} onChange={val => handleStyleChange('marginBottom', val)} />
-                    <StyleInput label="Padding Top" value={currentStyles.paddingTop} onChange={val => handleStyleChange('paddingTop', val)} />
-                    <StyleInput label="Padding Bottom" value={currentStyles.paddingBottom} onChange={val => handleStyleChange('paddingBottom', val)} />
-                    <StyleInput label="Padding Left" value={currentStyles.paddingLeft} onChange={val => handleStyleChange('paddingLeft', val)} />
-                    <StyleInput label="Padding Right" value={currentStyles.paddingRight} onChange={val => handleStyleChange('paddingRight', val)} />
+                    <StyleInput label="Margin Top" value={currentStylesForEditing.marginTop} onChange={val => handleStyleChange('marginTop', val)} isInherited={isInherited('marginTop')}/>
+                    <StyleInput label="Margin Bottom" value={currentStylesForEditing.marginBottom} onChange={val => handleStyleChange('marginBottom', val)} isInherited={isInherited('marginBottom')}/>
+                    <StyleInput label="Padding Top" value={currentStylesForEditing.paddingTop} onChange={val => handleStyleChange('paddingTop', val)} isInherited={isInherited('paddingTop')}/>
+                    <StyleInput label="Padding Bottom" value={currentStylesForEditing.paddingBottom} onChange={val => handleStyleChange('paddingBottom', val)} isInherited={isInherited('paddingBottom')}/>
+                    <StyleInput label="Padding Left" value={currentStylesForEditing.paddingLeft} onChange={val => handleStyleChange('paddingLeft', val)} isInherited={isInherited('paddingLeft')}/>
+                    <StyleInput label="Padding Right" value={currentStylesForEditing.paddingRight} onChange={val => handleStyleChange('paddingRight', val)} isInherited={isInherited('paddingRight')}/>
                 </Accordion>
                 <Accordion title="Typography">
-                    <ColorPicker label="Text Color" value={currentStyles.color} onChange={val => handleStyleChange('color', val)} palette={websiteData.palette} />
-                    <StyleInput label="Font Size" value={currentStyles.fontSize} onChange={val => handleStyleChange('fontSize', val)} />
-                    <StyleInput label="Text Align" value={currentStyles.textAlign} onChange={val => handleStyleChange('textAlign', val)} type="select" options={[{value: 'left', label: 'Left'}, {value: 'center', label: 'Center'}, {value: 'right', label: 'Right'}]} />
+                    <ColorPicker label="Text Color" value={currentStylesForEditing.color} onChange={val => handleStyleChange('color', val)} palette={websiteData.palette} isInherited={isInherited('color')} />
+                    <StyleInput label="Font Size" value={currentStylesForEditing.fontSize} onChange={val => handleStyleChange('fontSize', val)} isInherited={isInherited('fontSize')}/>
+                    <StyleInput label="Text Align" value={currentStylesForEditing.textAlign} onChange={val => handleStyleChange('textAlign', val)} type="select" options={[{value: 'left', label: 'Left'}, {value: 'center', label: 'Center'}, {value: 'right', label: 'Right'}]} isInherited={isInherited('textAlign')}/>
                 </Accordion>
                 <Accordion title="Background">
-                    <BackgroundPanel styles={currentStyles} palette={websiteData.palette} onStyleChange={handleStyleChange} />
+                    <BackgroundPanel styles={currentStylesForEditing} palette={websiteData.palette} onStyleChange={handleStyleChange} />
                 </Accordion>
                 <Accordion title="Border">
-                    <StyleInput label="Border Radius" value={currentStyles.borderRadius} onChange={val => handleStyleChange('borderRadius', val)} />
+                    <StyleInput label="Border Radius" value={currentStylesForEditing.borderRadius} onChange={val => handleStyleChange('borderRadius', val)} isInherited={isInherited('borderRadius')}/>
                 </Accordion>
                  {node.type === 'spacer' &&
                     <Accordion title="Dimensions">
-                        <StyleInput label="Height" value={currentStyles.height} onChange={val => handleStyleChange('height', val)} />
+                        <StyleInput label="Height" value={currentStylesForEditing.height} onChange={val => handleStyleChange('height', val)} isInherited={isInherited('height')}/>
                     </Accordion>
                  }
              </div>

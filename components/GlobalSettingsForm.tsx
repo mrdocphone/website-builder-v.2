@@ -1,3 +1,4 @@
+
 import React from 'react';
 import type { WebsiteData, Theme } from '../types';
 import type { Updater } from 'use-immer';
@@ -90,13 +91,47 @@ const GlobalSettingsForm: React.FC<GlobalSettingsFormProps> = ({ websiteData, se
       <div>
         <h3 className="text-lg font-semibold mb-2 text-slate-700">Global Colors</h3>
         <div className="grid grid-cols-2 gap-4">
-            {/* FIX: Renamed `key` to `paletteKey` to avoid conflict with React's reserved `key` prop, which was causing a TypeScript inference issue. */}
-            {(Object.keys(websiteData.palette) as Array<keyof typeof websiteData.palette>).map(paletteKey => (
+            {/* FIX: Corrected the type assertion for `Object.keys` to ensure `paletteKey` is correctly typed as a key of the palette object, resolving the type error in `handlePaletteChange`. */}
+            {(Object.keys(websiteData.palette) as (keyof typeof websiteData.palette)[]).map(paletteKey => (
                 <div key={paletteKey}>
                     <label className="text-sm font-medium text-slate-600 block mb-1 capitalize">{paletteKey}</label>
                     <input type="color" value={websiteData.palette[paletteKey]} onChange={e => handlePaletteChange(paletteKey, e.target.value)} className="w-full h-10 p-1 border border-slate-300 rounded-md"/>
                 </div>
             ))}
+        </div>
+      </div>
+       <div>
+        <h3 className="text-lg font-semibold mb-2 text-slate-700">SEO & Metadata</h3>
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm font-medium text-slate-600 block mb-1">Meta Title</label>
+            <input
+              type="text"
+              value={websiteData.metaTitle || ''}
+              onChange={(e) => handleInputChange('metaTitle', e.target.value)}
+              className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm"
+              placeholder="Your Website Title"
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-slate-600 block mb-1">Meta Description</label>
+            <textarea
+              value={websiteData.metaDescription || ''}
+              onChange={(e) => handleInputChange('metaDescription', e.target.value)}
+              className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm h-24"
+              placeholder="A brief description of your website."
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-slate-600 block mb-1">Favicon URL</label>
+            <input
+              type="text"
+              value={websiteData.faviconUrl || ''}
+              onChange={(e) => handleInputChange('faviconUrl', e.target.value)}
+              className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm"
+              placeholder="/favicon.ico"
+            />
+          </div>
         </div>
       </div>
       <div>

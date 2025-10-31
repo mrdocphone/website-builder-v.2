@@ -1,3 +1,4 @@
+
 import { v4 as uuidv4 } from 'uuid';
 import type { WebsiteNode, Section, Row, Column, Element, ResponsiveStyles } from '../types';
 
@@ -28,7 +29,8 @@ export function updateNodeById(nodes: WebsiteNode[], id: string, updates: Partia
 
             // Then, handle deep merges for nested properties if they were part of the updates.
             // This prevents the shallow spread from overwriting nested objects incorrectly.
-            if (updates.content && 'content' in node && node.content) {
+            // FIX: Added a type guard `'content' in updates` to ensure `updates.content` can be safely accessed.
+            if ('content' in updates && updates.content && 'content' in node && node.content) {
                 (updatedNode as any).content = { ...node.content, ...updates.content };
             }
 

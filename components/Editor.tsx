@@ -1,14 +1,16 @@
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { produce } from 'immer';
 import { useParams, useNavigate } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
-import type { WebsiteData, WebsiteNode, Section, Session, ElementType, Device, ResponsiveStyles } from '../types';
+import type { WebsiteData, WebsiteNode, Section, Session, ElementType, Device, ResponsiveStyles, Element } from '../types';
 import { findNodeById, updateNodeById, removeNodeById, addNode, moveNode } from '../utils/tree';
+import { generateSectionContent } from '../services/geminiService';
 import GlobalSettingsForm from './GlobalSettingsForm';
 import StylePanel from './SectionEditorForm';
 import Preview from './Preview';
 import PublishModal from './PublishModal';
-import { DesktopIcon, TabletIcon, MobileIcon, LayersIcon, PlusIcon as ComponentIcon, SettingsIcon, PencilIcon, TrashIcon, VideoIcon, StarIcon, CheckIcon, HeartIcon, UndoIcon, RedoIcon, CopyIcon, PasteIcon, FormIcon, EmbedIcon } from './icons';
+import { DesktopIcon, TabletIcon, MobileIcon, LayersIcon, PlusIcon as ComponentIcon, SettingsIcon, PencilIcon, TrashIcon, VideoIcon, StarIcon, CheckIcon, HeartIcon, UndoIcon, RedoIcon, CopyIcon, PasteIcon, FormIcon, EmbedIcon, MagicWandIcon } from './icons';
 
 type DropPosition = 'top' | 'bottom';
 
@@ -37,7 +39,7 @@ const useHistoryState = <T,>(initialState: T) => {
     }
 
     const undo = () => { if (currentIndex > 0) setCurrentIndex(prev => prev - 1); };
-    const redo = () => { if (currentIndex < history.length - 1) setCurrentIndex(prev => prev + 1); };
+    const redo = () => { if (currentIndex < history.length - 1) setCurrentIndex(prev => prev - 1); };
 
     return {
         state: history[currentIndex],
@@ -123,13 +125,15 @@ interface LayersPanelProps {
     nodes: WebsiteNode[];
     selectedNodeId: string | null;
     copiedNodeId: string | null;
+    generatingSectionId: string | null;
     onSelectNode: (id: string) => void;
     onDeleteNode: (id: string) => void;
     onMoveNode: (sourceId: string, targetId: string, position: DropPosition) => void;
     onCopyStyles: (id: string) => void;
     onPasteStyles: (id: string) => void;
+    onGenerateSectionContent: (sectionId: string) => void;
 }
-const LayerItem: React.FC<{node: WebsiteNode} & Omit<LayersPanelProps, 'nodes'>> = ({ node, selectedNodeId, copiedNodeId, onSelectNode, onDeleteNode, onMoveNode, onCopyStyles, onPasteStyles }) => {
+const LayerItem: React.FC<{node: WebsiteNode} & Omit<LayersPanelProps, 'nodes'>> = ({ node, selectedNodeId, copiedNodeId, generatingSectionId, onSelectNode, onDeleteNode, onMoveNode, onCopyStyles, onPasteStyles, onGenerateSectionContent }) => {
     const isSelected = selectedNodeId === node.id;
     const [dropPosition, setDropPosition] = useState<DropPosition | null>(null);
 
@@ -159,6 +163,8 @@ const LayerItem: React.FC<{node: WebsiteNode} & Omit<LayersPanelProps, 'nodes'>>
         return dropPosition === 'top' ? 'drop-indicator-top' : 'drop-indicator-bottom';
     }
 
+    const isGenerating = generatingSectionId === node.id;
+
     return (
         <div className="layer-item-wrapper">
             <div
@@ -173,8 +179,10 @@ const LayerItem: React.FC<{node: WebsiteNode} & Omit<LayersPanelProps, 'nodes'>>
                 <div className="layer-item-content">
                     <span className="layer-item-icon">&#x25A1;</span>
                     <span>{node.type}</span>
+                    {isGenerating && <div className="dashboard-spinner !w-4 !h-4 !border-2 ml-2"></div>}
                 </div>
                  <div className="flex items-center ml-auto opacity-50 hover:opacity-100 transition-opacity">
+                    {node.type === 'section' && <button onClick={(e) => { e.stopPropagation(); onGenerateSectionContent(node.id); }} title="Generate Content with AI" className="text-slate-500 hover:text-indigo-600 px-1 disabled:text-slate-300" disabled={isGenerating}><MagicWandIcon className="w-4 h-4" /></button>}
                     <button onClick={(e) => { e.stopPropagation(); onCopyStyles(node.id); }} title="Copy Styles" className="text-slate-500 hover:text-indigo-600 px-1"><CopyIcon className="w-4 h-4" /></button>
                     <button onClick={(e) => { e.stopPropagation(); onPasteStyles(node.id); }} title="Paste Styles" disabled={!copiedNodeId} className="text-slate-500 hover:text-indigo-600 px-1 disabled:text-slate-300"><PasteIcon className="w-4 h-4" /></button>
                     <button onClick={(e) => { e.stopPropagation(); onDeleteNode(node.id); }} title="Delete" className="text-slate-500 hover:text-red-600 px-1"><TrashIcon className="w-4 h-4" /></button>
@@ -182,7 +190,7 @@ const LayerItem: React.FC<{node: WebsiteNode} & Omit<LayersPanelProps, 'nodes'>>
             </div>
             {'children' in node && Array.isArray(node.children) && node.children.length > 0 && (
                 <div className="layer-children">
-                    {node.children.map(child => <LayerItem key={child.id} node={child as WebsiteNode} {...{selectedNodeId, copiedNodeId, onSelectNode, onDeleteNode, onMoveNode, onCopyStyles, onPasteStyles}} />)}
+                    {node.children.map(child => <LayerItem key={child.id} node={child as WebsiteNode} {...{selectedNodeId, copiedNodeId, generatingSectionId, onSelectNode, onDeleteNode, onMoveNode, onCopyStyles, onPasteStyles, onGenerateSectionContent}} />)}
                 </div>
             )}
         </div>
@@ -239,6 +247,7 @@ const Editor: React.FC<{session: Session}> = ({ session }) => {
   const [activeTab, setActiveTab] = useState<'layers' | 'add' | 'style' | 'settings'>('layers');
   const [device, setDevice] = useState<Device>('desktop');
   const [copiedStyles, setCopiedStyles] = useState<ResponsiveStyles | null>(null);
+  const [generatingSectionId, setGeneratingSectionId] = useState<string | null>(null);
 
   useEffect(() => {
     const loadData = async () => {
@@ -346,6 +355,47 @@ const Editor: React.FC<{session: Session}> = ({ session }) => {
   const handlePublishSuccess = (updatedData: WebsiteData) => {
     setWebsiteData(draft => updatedData);
   };
+  
+  const handleGenerateSectionContent = async (sectionId: string) => {
+    if (!websiteData) return;
+
+    const section = findNodeById(websiteData.children, sectionId);
+    if (!section || section.type !== 'section') {
+        alert("Can only generate content for a section.");
+        return;
+    }
+
+    setGeneratingSectionId(sectionId);
+    try {
+        const elementsByColumn = await generateSectionContent(websiteData, section as Section);
+        
+        setWebsiteData(draft => {
+            if (!draft) return;
+            const targetSection = findNodeById(draft.children, sectionId) as Section | null;
+            if (targetSection) {
+                targetSection.children.forEach((row, rowIndex) => {
+                    row.children.forEach((column, colIndex) => {
+                         if(elementsByColumn[colIndex]) {
+                            // Replace existing elements with new ones, keeping IDs
+                            // FIX: Cast the newly created element object to the `Element` type to resolve the discriminated union type inference issue.
+                            column.children = elementsByColumn[colIndex].map((newElementData: Omit<Element, 'id' | 'styles'>) => ({
+                                id: uuidv4(),
+                                styles: { desktop: {}, tablet: {}, mobile: {} },
+                                ...newElementData
+                            }) as Element);
+                         }
+                    });
+                });
+            }
+        });
+
+    } catch (error) {
+        alert(error instanceof Error ? error.message : "An unknown error occurred during content generation.");
+    } finally {
+        setGeneratingSectionId(null);
+    }
+};
+
 
   const selectedNode = selectedNodeId && websiteData ? findNodeById(websiteData.children, selectedNodeId) : null;
 
@@ -383,10 +433,10 @@ const Editor: React.FC<{session: Session}> = ({ session }) => {
                     ))}
                 </div>
                 <div className="sidebar-content">
-                    {activeTab === 'layers' && <LayersPanel nodes={websiteData.children} selectedNodeId={selectedNodeId} copiedNodeId={copiedStyles ? 'copied' : null} onSelectNode={handleSelectNode} onDeleteNode={handleRemoveNode} onMoveNode={handleMoveNode} onCopyStyles={handleCopyStyles} onPasteStyles={handlePasteStyles}/>}
+                    {activeTab === 'layers' && <LayersPanel nodes={websiteData.children} selectedNodeId={selectedNodeId} copiedNodeId={copiedStyles ? 'copied' : null} onSelectNode={handleSelectNode} onDeleteNode={handleRemoveNode} onMoveNode={handleMoveNode} onCopyStyles={handleCopyStyles} onPasteStyles={handlePasteStyles} onGenerateSectionContent={handleGenerateSectionContent} generatingSectionId={generatingSectionId} />}
                     {activeTab === 'add' && <AddPanel onAddElement={handleAddElementToSelected} />}
                     {activeTab === 'style' && (
-                        selectedNode ? <StylePanel node={selectedNode} onUpdate={handleUpdateNode} device={device} websiteData={websiteData} /> : <div className="p-4 text-center text-slate-500">Select an element to style.</div>
+                        selectedNode ? <StylePanel node={selectedNode} onUpdate={handleUpdateNode} websiteData={websiteData} /> : <div className="p-4 text-center text-slate-500">Select an element to style.</div>
                     )}
                     {activeTab === 'settings' && <GlobalSettingsForm websiteData={websiteData} setWebsiteData={setWebsiteData} onAddSection={() => handleAddNode(websiteData.id, 'section')} />}
                 </div>

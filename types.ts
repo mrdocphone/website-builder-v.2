@@ -102,6 +102,9 @@ export interface WebsiteData {
   slug: string;
   theme: Theme;
   heroImageUrl: string; // Kept for simplicity of the top hero
+  metaTitle?: string;
+  metaDescription?: string;
+  faviconUrl?: string;
   palette: {
       primary: string;
       secondary: string;
