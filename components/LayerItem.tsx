@@ -155,6 +155,7 @@ const LayerItem: React.FC<LayerItemProps> = (props) => {
             {hasChildren && !isCollapsed && (
                 <div className="layer-children">
                     {node.children.map(child => (
+                        // FIX: Replaced invalid `...arguments[0]` pattern with `{...props}` for stable recursion.
                         <LayerItem key={child.id} {...props} node={child} />
                     ))}
                 </div>

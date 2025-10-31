@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import type { Session, WebsiteData, Page } from '../types';
 import WebsiteSettingsModal from './WebsiteSettingsModal';
 import { 
-    LogoutIcon, LinkIcon, PlusIcon, TrashIcon, DuplicateIcon, 
+    LogoutIcon, LinkIcon, PlusIcon, TrashIcon, DuplicateIcon, PencilIcon,
     MoreVerticalIcon, GlobeIcon, SettingsIcon, CheckCircleIcon, CloudOffIcon, 
     SearchIcon, GridIcon, ListIcon, SunIcon, MoonIcon, TrendingUpIcon, TagIcon,
     UsersIcon
@@ -73,8 +73,7 @@ const WebsiteDashboard: React.FC<{ onLogout: () => void, session: Session }> = (
                 });
                 const newWebsite = await res.json();
                 if (res.ok) {
-                    // Refresh the list instead of navigating to a now-nonexistent editor
-                    await fetchWebsites();
+                    navigate(`/editor/${newWebsite.id}`);
                 } else {
                     alert(newWebsite.message || "Could not create website.");
                 }
@@ -259,6 +258,11 @@ const WebsiteCard: React.FC<{site: WebsiteData, session: Session, onAction: Func
             <div className="website-card-preview relative aspect-[16/9] w-full rounded-t-lg overflow-hidden group">
                 <img src={homepage?.heroImageUrl} className="w-full h-full object-cover"/>
                 <div className="absolute inset-0 bg-black bg-opacity-20"></div>
+                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                     <button onClick={() => navigate(`/editor/${site.id}`)} className="px-4 py-2 text-sm font-medium rounded-md bg-white/80 backdrop-blur-sm text-slate-900 hover:bg-white">
+                        Open Editor
+                    </button>
+                </div>
             </div>
             <div className="p-4 flex-grow flex flex-col">
                 <div className="flex justify-between items-start">
@@ -286,7 +290,7 @@ const WebsiteCard: React.FC<{site: WebsiteData, session: Session, onAction: Func
                 <div className="flex items-center gap-1">
                    {site.tags?.slice(0, 2).map(tag => <span key={tag} className="text-xs bg-slate-200 dark:bg-slate-700 px-1.5 py-0.5 rounded">{tag}</span>)}
                 </div>
-                <ActionMenu site={site} onAction={onAction} onSettings={onSettings} status={status}/>
+                <ActionMenu site={site} onAction={onAction} onSettings={onSettings} status={status} navigate={navigate}/>
             </div>
         </div>
     );
@@ -312,13 +316,16 @@ const WebsiteListItem: React.FC<{site: WebsiteData, session: Session, onAction: 
             </div>
             <div className="hidden lg:block text-sm text-gray-500">Last updated: {new Date(site.lastUpdatedAt || Date.now()).toLocaleDateString()}</div>
             <div className="flex items-center gap-2">
-                <ActionMenu site={site} onAction={onAction} onSettings={onSettings} status={status} />
+                 <button onClick={() => navigate(`/editor/${site.id}`)} className="px-4 py-1.5 text-sm font-medium rounded-md bg-white dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600">
+                    Edit
+                </button>
+                <ActionMenu site={site} onAction={onAction} onSettings={onSettings} status={status} navigate={navigate} />
             </div>
         </div>
     )
 }
 
-const ActionMenu: React.FC<{site: WebsiteData, onAction: Function, onSettings: Function, status: string}> = ({site, onAction, onSettings, status}) => {
+const ActionMenu: React.FC<{site: WebsiteData, onAction: Function, onSettings: Function, status: string, navigate: Function}> = ({site, onAction, onSettings, status, navigate}) => {
     const [isOpen, setIsOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
     useEffect(() => {
@@ -335,6 +342,7 @@ const ActionMenu: React.FC<{site: WebsiteData, onAction: Function, onSettings: F
             <button onClick={() => setIsOpen(!isOpen)} className="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700"><MoreVerticalIcon className="w-5 h-5"/></button>
             {isOpen && (
                  <div className="kebab-menu-dropdown w-48 rounded-md shadow-lg text-sm py-1">
+                    <button onClick={() => { navigate(`/editor/${site.id}`); setIsOpen(false); }} className="w-full text-left flex items-center gap-2 px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-700"><PencilIcon className="w-4 h-4"/> Edit Site</button>
                     <button onClick={() => { onSettings(site); setIsOpen(false); }} className="w-full text-left flex items-center gap-2 px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-700"><SettingsIcon className="w-4 h-4"/> Settings</button>
                     {status === 'published' && <button onClick={() => { onAction('unpublish', site); setIsOpen(false); }} className="w-full text-left flex items-center gap-2 px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-700"><CloudOffIcon className="w-4 h-4"/> Unpublish</button>}
                     <div className="my-1 h-px bg-slate-200 dark:bg-slate-700"></div>

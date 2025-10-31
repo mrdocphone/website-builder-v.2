@@ -18,7 +18,7 @@ export function findNodeById(nodes: WebsiteNode[], id: string): WebsiteNode | nu
 }
 
 // NEW: Recursive function to find the path (ancestry) of a node
-export function findNodePath(nodes: WebsiteNode[], id: string, path: WebsiteNode[] = []): WebsiteNode[] | null {
+export function findNodePath(nodes: WebsiteNode[], id: string, path: WebsiteNode[] = []): WebsiteNode[] {
     for (const node of nodes) {
         const currentPath = [...path, node];
         if (node.id === id) {
@@ -26,12 +26,12 @@ export function findNodePath(nodes: WebsiteNode[], id: string, path: WebsiteNode
         }
         if ('children' in node && Array.isArray(node.children)) {
             const foundPath = findNodePath(node.children as WebsiteNode[], id, currentPath);
-            if (foundPath) {
+            if (foundPath.length > currentPath.length) { // Path was found deeper
                 return foundPath;
             }
         }
     }
-    return null;
+    return path; // Return the path so far if not found deeper
 }
 
 
@@ -199,12 +199,14 @@ export function deepCloneWithNewIds(node: any): any {
                 id: uuidv4(),
             }));
         }
+        // FIX: Added handling for Social Icons which was previously missing, preventing data corruption on duplicate.
         if (Array.isArray(newNode.content.networks)) { // For Social Icons
             newNode.content.networks = newNode.content.networks.map((network: SocialIconsElement['content']['networks'][0]) => ({
                 ...network,
                 id: uuidv4(),
             }));
         }
+        // FIX: Added handling for Navigation links which was previously missing.
         if (Array.isArray(newNode.content.links)) { // For Navigation
              newNode.content.links = newNode.content.links.map((link: NavLink) => ({
                 ...link,

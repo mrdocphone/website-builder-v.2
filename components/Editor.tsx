@@ -8,7 +8,7 @@ import { generateSectionContent } from '../services/geminiService';
 import StylePanel from './SectionEditorForm'; // This is now the Right Inspector
 import Preview from './Preview';
 import PublishModal from './PublishModal';
-import { DesktopIcon, TabletIcon, MobileIcon, UndoIcon, RedoIcon, CommandIcon } from './icons';
+import { DesktopIcon, TabletIcon, MobileIcon, UndoIcon, RedoIcon, CommandIcon, PencilIcon } from './icons';
 import ContextMenu from './ContextMenu';
 import CommandPalette from './CommandPalette';
 import PageSettingsModal from './PageSettingsModal';
@@ -45,7 +45,6 @@ const useHistoryState = <T,>(initialState: T) => {
     }
 
     const undo = () => { if (currentIndex > 0) setCurrentIndex(prev => prev - 1); };
-    // FIX: Redo should increment the index, not decrement it.
     const redo = () => { if (currentIndex < history.length - 1) setCurrentIndex(prev => prev + 1); };
 
     return {
@@ -297,7 +296,7 @@ const Editor: React.FC<{session: Session}> = ({ session }) => {
         if (selectedNode) {
             if (selectedNode.type === 'column') targetColumnId = selectedNode.id;
             else if (selectedNode.type === 'row' || selectedNode.type === 'section') {
-                const firstColumn = (selectedNode as any).children?.[0];
+                const firstColumn = (selectedNode as any).children?.[0]?.children?.[0];
                 if (firstColumn?.type === 'column') targetColumnId = firstColumn.id;
             }
         }
@@ -391,6 +390,72 @@ const Editor: React.FC<{session: Session}> = ({ session }) => {
     };
     const handleDragLeave = () => setDropTarget(null);
     const handleDrop = (e: React.DragEvent) => { e.preventDefault(); if (draggedNodeId && dropTarget) handleMoveNode(draggedNodeId, dropTarget.targetId, dropTarget.position); setDraggedNodeId(null); setDropTarget(null); };
+    
+    // FEAT: AI Function Implementations
+    const handleGenerateSection = useCallback(async (sectionId: string) => {
+        if (!websiteData || !activePage) return;
+        setGeneratingSectionId(sectionId);
+        try {
+            const section = findNodeById(contentTree || [], sectionId) as Section;
+            if (!section) throw new Error("Section not found");
+
+            const generatedElementsInColumns = await generateSectionContent(websiteData, activePage.tagline || '', section);
+
+            updateWebsiteData(draft => {
+                const tree = editingContext === 'page' ? draft.pages.find(p => p.id === activePageId)?.children : draft[editingContext];
+                const draftSection = findNodeById(tree || [], sectionId) as Section;
+                if (draftSection) {
+                    const columns = draftSection.children.flatMap(row => row.children);
+                    columns.forEach((column, index) => {
+                        const newElements = (generatedElementsInColumns[index] || []).map((el: any) => ({
+                            ...createDefaultElement(el.type as ElementType),
+                            id: uuidv4(),
+                            content: el.content,
+                        }));
+                        column.children = newElements;
+                    });
+                }
+            }, 'Generate Section Content');
+
+        } catch (e) {
+            console.error("Failed to generate section content:", e);
+            alert(e instanceof Error ? e.message : 'AI generation failed.');
+        } finally {
+            setGeneratingSectionId(null);
+        }
+    }, [websiteData, activePage, activePageId, editingContext, contentTree, updateWebsiteData]);
+
+
+    const handleAiTextUpdate = useCallback(async (nodeId: string, action: string, options?: { tone?: string }) => {
+        if (!websiteData) return;
+        setIsAiLoading(true);
+        try {
+            const node = findNodeById(contentTree || [], nodeId);
+            const text = (node as any)?.content?.text;
+            if (!node || typeof text === 'undefined') {
+                throw new Error('Node with text content not found.');
+            }
+
+            const res = await fetch('/api/ai-text', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text, action, ...options }),
+            });
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.message || 'AI text generation failed.');
+            }
+            const { newText } = await res.json();
+            handleUpdateNode(nodeId, { content: { ...(node as any).content, text: newText } });
+
+        } catch (e) {
+            console.error("AI Text Update failed:", e);
+            alert(e instanceof Error ? e.message : 'An unknown error occurred.');
+        } finally {
+            setIsAiLoading(false);
+        }
+    }, [websiteData, contentTree, handleUpdateNode]);
+
 
     if (!websiteData || !activePage) return <div className="editor-container items-center justify-center"><div className="dashboard-spinner"></div></div>;
     if (error) return <div className="p-4 text-red-600">{error}</div>;
@@ -429,7 +494,7 @@ const Editor: React.FC<{session: Session}> = ({ session }) => {
 
                 <div className="editor-canvas-wrapper" onClick={() => setSelectedNodeIds([])}>
                     <div className={`preview-canvas-container preview-canvas-${device}`}>
-                        <Preview websiteData={websiteData} activePage={activePage} interactive device={device} selectedNodeId={selectedNodeIds[0]} selectedNodeIds={selectedNodeIds} hoveredNodeId={hoveredNodeId} onSelectNode={handleSelectNode} onHoverNode={setHoveredNodeId} onUpdateNode={handleUpdateNode} onAiTextUpdate={()=>{}} isAiLoading={isAiLoading} onContextMenuRequest={handleContextMenuRequest} onAddSection={()=>{}} onGenerateSection={()=>{}} generatingSectionId={generatingSectionId} />
+                        <Preview websiteData={websiteData} activePage={activePage} interactive device={device} selectedNodeId={selectedNodeIds[0]} selectedNodeIds={selectedNodeIds} hoveredNodeId={hoveredNodeId} onSelectNode={handleSelectNode} onHoverNode={setHoveredNodeId} onUpdateNode={handleUpdateNode} onAiTextUpdate={handleAiTextUpdate} isAiLoading={isAiLoading} onContextMenuRequest={handleContextMenuRequest} onAddSection={()=>{}} onGenerateSection={handleGenerateSection} generatingSectionId={generatingSectionId} />
                     </div>
                 </div>
                 

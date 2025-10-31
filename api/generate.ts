@@ -43,6 +43,9 @@ export default async function handler(request: Request) {
             tagline: string;
             section: Section;
         };
+        
+        const columns = section.children.flatMap(row => row.children);
+        const columnCount = columns.length;
 
         const prompt = `
             You are an expert web designer and copywriter. Your task is to generate the content for a single section of a website.
@@ -52,7 +55,7 @@ export default async function handler(request: Request) {
             - Tagline: "${tagline}"
 
             **Instructions:**
-            - Generate content for a section that has ${section.children.length} columns.
+            - Generate content for a section that has ${columnCount} columns.
             - The content should be professional, engaging, and relevant to the business.
             - For images, provide a URL for a high-quality, relevant stock photo from Unsplash.
             - Ensure the response is a clean JSON array of elements, matching the provided schema.
@@ -71,12 +74,14 @@ export default async function handler(request: Request) {
         
         const jsonResponse = JSON.parse(response.text);
 
-        // We need to distribute the flat array of elements into the columns of the section
-        const elementsByColumn: any[][] = section.children.map(() => []);
-        let currentColumn = 0;
+        // FIX: Distribute elements correctly across all columns, even in multi-row sections.
+        const elementsByColumn: any[][] = columns.map(() => []);
+        let currentColumnIndex = 0;
         jsonResponse.forEach((element: any) => {
-            elementsByColumn[currentColumn].push(element);
-            currentColumn = (currentColumn + 1) % section.children.length;
+            if (elementsByColumn[currentColumnIndex]) {
+                elementsByColumn[currentColumnIndex].push(element);
+            }
+            currentColumnIndex = (currentColumnIndex + 1) % columnCount;
         });
 
         return new Response(JSON.stringify(elementsByColumn), {

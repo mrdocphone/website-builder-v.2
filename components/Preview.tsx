@@ -39,12 +39,12 @@ const mergeStylesForDevice = (styles: ResponsiveStyles, device: Device): StylePr
     const desktop = styles.desktop || {};
 
     if (device === 'mobile') {
-        return mobile;
+        return { ...desktop, ...tablet, ...mobile };
     }
     if (device === 'tablet') {
-        return { ...mobile, ...tablet };
+        return { ...desktop, ...tablet };
     }
-    return { ...mobile, ...tablet, ...desktop };
+    return desktop;
 };
 
 
@@ -56,7 +56,7 @@ const Accordion: React.FC<Omit<PreviewProps, 'websiteData' | 'activePage'> & { e
     if (interactive) {
       return (
         <div className="preview-accordion-interactive">
-          {element.content.items.map((item, index) => (
+          {(element.content.items || []).map((item, index) => (
              <div key={item.id} className="mb-2">
                 <div className="p-2 bg-slate-100 font-semibold text-sm text-slate-600 rounded-t-md">
                     Item {index + 1}: {item.title}
@@ -81,7 +81,7 @@ const Accordion: React.FC<Omit<PreviewProps, 'websiteData' | 'activePage'> & { e
 
     return (
         <div className="preview-accordion">
-            {element.content.items.map(item => (
+            {(element.content.items || []).map(item => (
                 <div key={item.id} className="preview-accordion-item">
                     <div className="preview-accordion-title" onClick={() => setOpenItem(openItem === item.id ? null : item.id)}>
                         {item.title}
@@ -94,20 +94,21 @@ const Accordion: React.FC<Omit<PreviewProps, 'websiteData' | 'activePage'> & { e
     );
 };
 
-// NEW: Tabs Preview Component
+// FEAT: Tabs Preview Component
 const Tabs: React.FC<Omit<PreviewProps, 'websiteData' | 'activePage'> & { element: TabsElement; theme: ThemeConfig, websiteData: WebsiteData, context: 'page' | 'header' | 'footer' }> = ({ element, interactive, ...props }) => {
-    const [activeTab, setActiveTab] = useState(element.content.items[0]?.id || null);
+    const items = element.content.items || [];
+    const [activeTab, setActiveTab] = useState(items[0]?.id || null);
 
     if (interactive) {
         return (
             <div className="preview-tabs">
-                {element.content.items.map((item, index) => (
+                {items.map((item, index) => (
                     <div key={item.id}>
                         <div className="p-2 bg-slate-100 font-semibold text-sm text-slate-600 rounded-t-md mt-4">
                            Tab {index + 1}: {item.title}
                         </div>
-                        <div className="preview-tab-content border-l border-r border-b rounded-b-md">
-                            {item.content.map(child => (
+                        <div className="preview-tab-content border-l border-r border-b rounded-b-md p-4">
+                            {(item.content || []).map(child => (
                                 <NodeRenderer key={child.id} node={child} {...props} />
                             ))}
                         </div>
@@ -117,18 +118,18 @@ const Tabs: React.FC<Omit<PreviewProps, 'websiteData' | 'activePage'> & { elemen
         )
     }
 
-    const activeItem = element.content.items.find(item => item.id === activeTab);
+    const activeItem = items.find(item => item.id === activeTab);
     return (
         <div className="preview-tabs">
             <div className="preview-tabs-nav">
-                {element.content.items.map(item => (
+                {items.map(item => (
                     <button key={item.id} onClick={() => setActiveTab(item.id)} className={`preview-tab-button ${activeTab === item.id ? 'active' : ''}`}>
                         {item.title}
                     </button>
                 ))}
             </div>
-            <div className="preview-tab-content">
-                {activeItem?.content.map(child => (
+            <div className="preview-tab-content p-4">
+                {(activeItem?.content || []).map(child => (
                     <NodeRenderer key={child.id} node={child} {...props} />
                 ))}
             </div>
@@ -146,7 +147,7 @@ const ElementRenderer: React.FC<{
     [key: string]: any; // Catch-all for other preview props
 }> = React.memo(({ element, theme, websiteData, interactive, onUpdateNode, ...props }) => {
     if (!element.content || typeof element.content !== 'object') {
-         if (element.type !== 'divider' && element.type !== 'navigation' && element.type !== 'spacer') return null;
+         if (element.type !== 'divider' && element.type !== 'spacer') return null;
     }
 
     const handleContentChange = (newHtml: string) => {
@@ -185,9 +186,9 @@ const ElementRenderer: React.FC<{
         }
         case 'button': {
             const { text, href } = element.content as ButtonElement['content'];
-            if (!text || !href) { return null; }
+            if (!text) { return null; }
             return (
-                <a href={href} className={`inline-block ${theme.primary} ${theme.primaryText} px-6 py-3 rounded-md font-semibold no-underline`}>
+                <a href={interactive ? undefined : href} className={`inline-block ${theme.primary} ${theme.primaryText} px-6 py-3 rounded-md font-semibold no-underline`}>
                     <ContentEditable tagName="span" html={text} onChange={handleContentChange} />
                 </a>
             );
@@ -250,11 +251,11 @@ const ElementRenderer: React.FC<{
         case 'form': {
             const { buttonText, fields } = element.content as FormElement['content'];
              if (interactive && (!fields || fields.length === 0)) {
-                return <div className="p-8 text-center bg-slate-50 border-dashed border-2 rounded-md text-slate-500">Form fields can be added in the Style Panel.</div>;
+                return <div className="p-8 text-center bg-slate-50 border-dashed border-2 rounded-md text-slate-500">Form fields can be added in the Inspector.</div>;
             }
             return (
                 <form className="preview-form space-y-4" onSubmit={e => e.preventDefault()}>
-                     {fields.map(field => (
+                     {(fields || []).map(field => (
                         <div key={field.id} className="preview-form-field">
                             <label htmlFor={field.id}>{field.label} {field.required && '*'}</label>
                             {field.type === 'textarea' ? (
@@ -282,13 +283,13 @@ const ElementRenderer: React.FC<{
             const { links } = element.content as NavigationElement['content'];
             if (!links || links.length === 0) {
                 if (interactive) {
-                    return <div className="p-4 text-center bg-slate-50 border-dashed border-2 rounded-md text-slate-500">Add nav links in the Style Panel.</div>;
+                    return <div className="p-4 text-center bg-slate-50 border-dashed border-2 rounded-md text-slate-500">Add nav links in the Inspector.</div>;
                 }
                 return null;
             }
             return (
                 <nav className="preview-nav w-full">
-                    <ul>
+                    <ul className="flex items-center gap-4">
                         {links.map((link: NavLink) => {
                             const page = link.type === 'internal' ? websiteData.pages.find(p => p.id === link.pageId) : null;
                             const href = link.type === 'internal' 
@@ -299,7 +300,7 @@ const ElementRenderer: React.FC<{
 
                             return (
                                 <li key={link.id}>
-                                    <a href={href} target={link.openInNewTab ? '_blank' : '_self'} rel={link.openInNewTab ? 'noopener noreferrer' : ''}>
+                                    <a href={interactive ? undefined : href} target={link.openInNewTab ? '_blank' : '_self'} rel={link.openInNewTab ? 'noopener noreferrer' : ''}>
                                         {link.text}
                                     </a>
                                 </li>
@@ -332,7 +333,7 @@ const ElementRenderer: React.FC<{
             const { networks } = element.content as SocialIconsElement['content'];
             return (
                 <div className="flex gap-4">
-                    {networks.map(n => <a key={n.id} href={n.url} target="_blank" rel="noopener noreferrer">{n.network}</a>)}
+                    {networks.map(n => <a key={n.id} href={interactive ? undefined : n.url} target="_blank" rel="noopener noreferrer">{n.network}</a>)}
                 </div>
             )
         }
@@ -438,9 +439,11 @@ const NodeRenderer: React.FC<Omit<PreviewProps, 'websiteData' | 'activePage'> & 
     if (!isVisible && props.interactive) {
          // Show a placeholder for hidden items in the editor
         return (
-             <div className="p-2 text-center text-xs text-slate-400 bg-slate-100 border-dashed border">
-                Hidden on {device}
-            </div>
+            <InteractiveWrapper {...props} node={node} isSelected={false} isHovered={false}>
+                <div className="p-2 text-center text-xs text-slate-400 bg-slate-100 border-dashed border">
+                    Hidden on {device}
+                </div>
+            </InteractiveWrapper>
         )
     }
     if (!isVisible && !props.interactive) return null;
@@ -480,23 +483,23 @@ const NodeRenderer: React.FC<Omit<PreviewProps, 'websiteData' | 'activePage'> & 
         case 'section':
             Tag = 'section';
             className = 'w-full relative'; // Added relative for AI button positioning
-            if (node.animation && node.animation !== 'none') {
+            if (!props.interactive && node.animation && node.animation !== 'none') {
                 dataAttributes['data-animation'] = node.animation;
             }
             break;
         case 'row':
             className = 'w-full';
-            mergedStyles.display = 'flex'; // Rows are always flex
+            if (!mergedStyles.display) mergedStyles.display = 'flex'; // Rows are always flex
             break;
         case 'column':
             className = 'w-full';
-            mergedStyles.display = 'flex'; // Columns are flex containers for elements
-            mergedStyles.flexDirection = mergedStyles.flexDirection || 'column'; // Default to column
+            if (!mergedStyles.display) mergedStyles.display = 'flex'; // Columns are flex containers for elements
+            if (!mergedStyles.flexDirection) mergedStyles.flexDirection = 'column'; // Default to column
              if ((node as Column).children.length === 0 && props.interactive) {
                 // FIX: Added a visible placeholder for empty columns in the editor for better UX.
                 return (
                     <InteractiveWrapper {...props} node={node} isSelected={isSelected} isHovered={isHovered}>
-                         <div className="p-4 min-h-[50px] w-full flex items-center justify-center text-center text-xs text-slate-400 bg-slate-50 border-2 border-dashed border-slate-300 rounded-md" style={mergedStyles}>
+                         <div style={mergedStyles} className="p-4 min-h-[50px] w-full flex items-center justify-center text-center text-xs text-slate-400 bg-slate-50/50 border-2 border-dashed border-slate-300 rounded-md">
                             Click to add elements here
                         </div>
                     </InteractiveWrapper>
