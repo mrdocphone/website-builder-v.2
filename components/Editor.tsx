@@ -1,10 +1,11 @@
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { produce } from 'immer';
 import { useParams, useNavigate } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
 import type { WebsiteData, WebsiteNode, Section, Session, ElementType, Device, ResponsiveStyles, Element, Page, StyleProperties, Column } from '../types';
-// FIX: Removed `deepCloneWebsite` as it's not exported from the tree utility module.
-import { findNodeById, updateNodeById, removeNodeById, addNode, moveNode, duplicateNodeById, findNodePath, deepCloneWithNewIds, addNodeNextTo, findNodeAndParent } from '../utils/tree';
+// FIX: Added isDropAllowed to check drag-and-drop validity.
+import { findNodeById, updateNodeById, removeNodeById, addNode, moveNode, duplicateNodeById, findNodePath, deepCloneWithNewIds, addNodeNextTo, findNodeAndParent, isDropAllowed } from '../utils/tree';
 import { generateSectionContent } from '../services/geminiService';
 import GlobalSettingsForm from './GlobalSettingsForm';
 import StylePanel from './SectionEditorForm';
@@ -52,6 +53,7 @@ const useHistoryState = <T,>(initialState: T) => {
     }
 
     const undo = () => { if (currentIndex > 0) setCurrentIndex(prev => prev - 1); };
+    // FIX: Redo was incorrectly decrementing the index instead of incrementing it.
     const redo = () => { if (currentIndex < history.length - 1) setCurrentIndex(prev => prev + 1); };
 
     return {
@@ -189,6 +191,11 @@ const Editor: React.FC<{session: Session}> = ({ session }) => {
   const selectedNodes = selectedNodeIds.map(id => findNodeById(contentTree || [], id)).filter(Boolean) as WebsiteNode[];
   const selectedNode = selectedNodes.length === 1 ? selectedNodes[0] : null;
 
+  const handleSetEditingContext = (context: EditingContext) => {
+      setSelectedNodeIds([]); // FIX: Clear selection when changing context to prevent errors.
+      setEditingContext(context);
+  }
+
   // NEW: Save function
   const handleSave = useCallback(async () => {
     if (!isDirty || !websiteData) return;
@@ -286,12 +293,16 @@ const Editor: React.FC<{session: Session}> = ({ session }) => {
             return;
         }
 
+        const activeEl = document.activeElement;
+        // FIX: Prevent shortcuts when any input/textarea is focused, not just contenteditable.
+        if (activeEl?.tagName === 'INPUT' || activeEl?.tagName === 'TEXTAREA' || (activeEl?.hasAttribute('contenteditable') && activeEl?.getAttribute('contenteditable') === 'true')) {
+            return;
+        }
+
         if (selectedNodeIds.length === 0) return;
         const selectedNodeId = selectedNodeIds[0];
 
         if (e.key === 'Delete' || e.key === 'Backspace') {
-            const activeEl = document.activeElement;
-            if (activeEl?.hasAttribute('contenteditable') && activeEl?.getAttribute('contenteditable') === 'true') return;
             e.preventDefault();
             handleDeleteNode(selectedNodeId);
         }
@@ -340,7 +351,6 @@ const Editor: React.FC<{session: Session}> = ({ session }) => {
         if (currentTree && removeNodeById(currentTree, id)) {
             setSelectedNodeIds(parentId ? [parentId] : []);
              // After removing, if the deleted node was a column, resize siblings
-            // FIX: Added a type guard (`'type' in location.parent`) to ensure the parent is a WebsiteNode before accessing its `type` property.
             if (location.node.type === 'column' && 'children' in location.parent && 'type' in location.parent && location.parent.type === 'row') {
                 const parentRow = findNodeById(currentTree, (location.parent as WebsiteNode).id) as any;
                 if (parentRow && parentRow.children.length > 0) {
@@ -494,7 +504,28 @@ const Editor: React.FC<{session: Session}> = ({ session }) => {
 
   // Drag & Drop Handlers
   const handleDragStart = (e: React.DragEvent, nodeId: string) => { e.dataTransfer.effectAllowed = 'move'; setDraggedNodeId(nodeId); };
-  const handleDragOver = (e: React.DragEvent, targetId: string) => { e.preventDefault(); if (!draggedNodeId || draggedNodeId === targetId) return; const rect = (e.currentTarget as HTMLElement).getBoundingClientRect(); const position: DropPosition = e.clientY - rect.top < rect.height / 2 ? 'top' : 'bottom'; if (dropTarget?.targetId !== targetId || dropTarget?.position !== position) setDropTarget({ targetId, position }); };
+  const handleDragOver = (e: React.DragEvent, targetId: string) => {
+      e.preventDefault();
+      if (!draggedNodeId || draggedNodeId === targetId) return;
+
+      const sourceNode = findNodeById(contentTree || [], draggedNodeId);
+      const targetLocation = findNodeAndParent(contentTree || [], targetId);
+      if (!sourceNode || !targetLocation) {
+          if (dropTarget) setDropTarget(null);
+          return;
+      }
+      const targetParentType = 'type' in targetLocation.parent ? (targetLocation.parent as WebsiteNode).type : 'page';
+
+      if (isDropAllowed(sourceNode.type, targetParentType)) {
+        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+        const position: DropPosition = e.clientY - rect.top < rect.height / 2 ? 'top' : 'bottom';
+        if (dropTarget?.targetId !== targetId || dropTarget?.position !== position) {
+            setDropTarget({ targetId, position });
+        }
+      } else {
+          if (dropTarget) setDropTarget(null);
+      }
+  };
   const handleDragLeave = () => setDropTarget(null);
   const handleDrop = (e: React.DragEvent) => { e.preventDefault(); if (draggedNodeId && dropTarget) handleMoveNode(draggedNodeId, dropTarget.targetId, dropTarget.position); setDraggedNodeId(null); setDropTarget(null); };
 
@@ -529,6 +560,17 @@ const Editor: React.FC<{session: Session}> = ({ session }) => {
         setAlignmentToolbarState(null);
     }
   }, [selectedNodeIds, contentTree]);
+  
+  const handleSetActiveTab = (tab: any) => {
+    // UX Improvement: If switching to 'add' tab and selected node is not a column, select its parent.
+    if (tab === 'add' && selectedNode && selectedNode.type !== 'column') {
+        const location = findNodeAndParent(contentTree || [], selectedNode.id);
+        if (location && 'id' in location.parent) {
+            setSelectedNodeIds([(location.parent as WebsiteNode).id]);
+        }
+    }
+    setActiveTab(tab);
+  }
 
   if (!websiteData || !activePage) return <div className="editor-container items-center justify-center"><div className="dashboard-spinner"></div></div>;
   if (error) return <div className="p-4 text-red-600">{error}</div>;
@@ -538,10 +580,10 @@ const Editor: React.FC<{session: Session}> = ({ session }) => {
   return (
     <div className={`editor-container ${editorTheme === 'dark' ? 'dark-mode' : ''}`}>
       <style>{dynamicStyles}</style>
-      <EditorTopBar websiteName={websiteData.name} device={device} editingContext={editingContext} onSetDevice={setDevice} onSetEditingContext={setEditingContext} onPublish={() => setIsPublishModalOpen(true)} isSaving={isSaving} saveStatus={saveStatus} onUndo={undo} onRedo={redo} canUndo={canUndo} canRedo={canRedo} onOpenCommandPalette={() => setIsCommandPaletteOpen(true)} />
+      <EditorTopBar websiteName={websiteData.name} device={device} editingContext={editingContext} onSetDevice={setDevice} onSetEditingContext={handleSetEditingContext} onPublish={() => setIsPublishModalOpen(true)} isSaving={isSaving} saveStatus={saveStatus} onUndo={undo} onRedo={redo} canUndo={canUndo} canRedo={canRedo} onOpenCommandPalette={() => setIsCommandPaletteOpen(true)} />
       <div className="editor-main">
         <aside className="editor-sidebar">
-           <div className="sidebar-tabs">{[{id: 'pages', icon: LayersIcon, label: 'Pages'}, {id: 'add', icon: ComponentIcon, label: 'Add'}, {id: 'history', icon: HistoryIcon, label: 'History'}, {id: 'style', icon: SettingsIcon, label: 'Style'}, {id: 'settings', icon: SettingsIcon, label: 'Global'}].map(tab => (<button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`sidebar-tab ${activeTab === tab.id ? 'active' : ''}`} disabled={tab.id === 'style' && selectedNodeIds.length === 0}><tab.icon className="w-5 h-5" /> {tab.label}</button>))}</div>
+           <div className="sidebar-tabs">{[{id: 'pages', icon: LayersIcon, label: 'Pages'}, {id: 'add', icon: ComponentIcon, label: 'Add'}, {id: 'history', icon: HistoryIcon, label: 'History'}, {id: 'style', icon: SettingsIcon, label: 'Style'}, {id: 'settings', icon: SettingsIcon, label: 'Global'}].map(tab => (<button key={tab.id} onClick={() => handleSetActiveTab(tab.id as any)} className={`sidebar-tab ${activeTab === tab.id ? 'active' : ''}`} disabled={tab.id === 'style' && selectedNodeIds.length === 0}><tab.icon className="w-5 h-5" /> {tab.label}</button>))}</div>
            <div className="sidebar-content">
              {activeTab === 'pages' && (
                 <PagesAndLayersPanel
@@ -567,7 +609,7 @@ const Editor: React.FC<{session: Session}> = ({ session }) => {
              )}
              {activeTab === 'add' && <AddPanel onAddElement={handleAddElement} />}
              {activeTab === 'history' && (<div>{history.slice().reverse().map((item, index) => <div key={history.length - 1 - index} onClick={() => jumpToState(history.length - 1 - index)} className={`history-item ${history.length - 1 - index === currentIndex ? 'active' : ''}`}>{item.message}</div>)}</div>)}
-             {activeTab === 'style' && selectedNode && ( <StylePanel key={selectedNode.id} node={selectedNode} nodePath={nodePath || []} onSelectNode={(id) => setSelectedNodeIds([id])} websiteData={websiteData} onUpdate={handleUpdateNode} onOpenAssetManager={() => setIsAssetManagerOpen(true)} /> )}
+             {activeTab === 'style' && selectedNode && ( <StylePanel key={selectedNode.id} node={selectedNode} nodePath={nodePath || []} onSelectNode={(id) => setSelectedNodeIds([id])} websiteData={websiteData} onUpdate={handleUpdateNode} onOpenAssetManager={() => setIsAssetManagerOpen(true)} device={device} /> )}
              {activeTab === 'settings' && <GlobalSettingsForm websiteData={websiteData} setWebsiteData={updateWebsiteData} onAddSection={handleAddSection} onSetEditingContext={setEditingContext} />}
           </div>
            <div className="p-2 border-t flex items-center justify-between"><button onClick={() => setViewMode(v => v === 'normal' ? 'wireframe' : 'normal')}><WireframeIcon/></button><button onClick={() => setIsAssetManagerOpen(true)}><AssetIcon/></button><button onClick={() => setEditorTheme(t => t === 'light' ? 'dark' : 'light')}>{editorTheme === 'light' ? <MoonIcon/> : <SunIcon/>}</button></div>

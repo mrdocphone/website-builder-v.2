@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from 'react';
 import type { WebsiteNode, Device, StyleProperties, Element, IconElement, WebsiteData, FormElement, EmbedElement, GalleryElement, SocialIconsElement, FormField, VideoElement, AccordionElement, TabsElement, Row, Column } from '../types';
 import { availableIcons, IconRenderer, DesktopIcon, TabletIcon, MobileIcon, EyeIcon, EyeSlashIcon, PlusIcon, TrashIcon, DragHandleIcon, PencilIcon, GridIcon, AnimationIcon, CheckboxIcon, SelectIcon, TextColorIcon, LayoutIcon } from './icons';
@@ -162,14 +163,27 @@ const StylePanel: React.FC<StylePanelProps> = ({ node, nodePath, websiteData, on
 
     const handleLayoutChange = (layout: number[]) => {
         const row = node as Row;
+        const oldColumns = row.children;
+        const newColumnCount = layout.length;
+        const oldColumnCount = oldColumns.length;
+
         const newColumns: Column[] = layout.map((flexValue, i) => {
-            const existingCol = row.children[i];
+            const existingCol = oldColumns[i];
             const basis = `${(flexValue / layout.reduce((a, b) => a + b, 0)) * 100}%`;
             if (existingCol) {
-                return { ...existingCol, styles: { ...existingCol.styles, desktop: { ...existingCol.styles.desktop, flexBasis: basis } } };
+                const newStyles = { ...existingCol.styles };
+                if (!newStyles.desktop) newStyles.desktop = {};
+                newStyles.desktop.flexBasis = basis;
+                return { ...existingCol, styles: newStyles };
             }
             return { id: uuidv4(), type: 'column', styles: { desktop: { flexBasis: basis }, tablet: {}, mobile: {} }, children: [] };
         });
+
+        // If reducing column count, move children from removed columns to the last new column
+        if (newColumnCount < oldColumnCount) {
+            const childrenToMove = oldColumns.slice(newColumnCount).flatMap(col => col.children);
+            newColumns[newColumns.length - 1].children.push(...childrenToMove);
+        }
 
         onUpdate(node.id, { children: newColumns });
     };

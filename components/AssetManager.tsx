@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import type { WebsiteData } from '../types';
 import { PlusIcon, TrashIcon, XIcon } from './icons';
@@ -6,9 +7,10 @@ interface AssetManagerProps {
     websiteData: WebsiteData;
     onClose: () => void;
     onUpdateAssets: (assets: WebsiteData['assets']) => void;
+    onSelectAsset: (url: string) => void;
 }
 
-const AssetManager: React.FC<AssetManagerProps> = ({ websiteData, onClose, onUpdateAssets }) => {
+const AssetManager: React.FC<AssetManagerProps> = ({ websiteData, onClose, onUpdateAssets, onSelectAsset }) => {
     const [newImageUrl, setNewImageUrl] = useState('');
 
     const handleAddAsset = () => {
@@ -44,16 +46,18 @@ const AssetManager: React.FC<AssetManagerProps> = ({ websiteData, onClose, onUpd
                 <div className="flex-grow overflow-y-auto p-6">
                     <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-4">
                         {websiteData.assets.map(asset => (
-                            <div key={asset.id} className="group relative aspect-square border rounded-md overflow-hidden">
+                            <div key={asset.id} className="group relative aspect-square border rounded-md overflow-hidden cursor-pointer" onClick={() => onSelectAsset(asset.url)}>
                                 <img src={asset.url} alt={asset.name} className="w-full h-full object-cover" />
                                 <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all flex items-center justify-center">
                                     <button
-                                        onClick={() => handleRemoveAsset(asset.id)}
+                                        onClick={(e) => { e.stopPropagation(); handleRemoveAsset(asset.id);}}
                                         className="p-2 bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                                        title={`Remove ${asset.name}`}
                                     >
                                         <TrashIcon className="w-5 h-5" />
                                     </button>
                                 </div>
+                                <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white text-xs p-1 truncate opacity-0 group-hover:opacity-100 transition-opacity">{asset.name}</div>
                             </div>
                         ))}
                     </div>

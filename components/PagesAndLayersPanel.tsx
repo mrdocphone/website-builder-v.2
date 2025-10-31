@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import type { Page, WebsiteNode, Device } from '../types';
 import LayerItem from './LayerItem';
@@ -52,10 +53,32 @@ const PagesAndLayersPanel: React.FC<PagesAndLayersPanelProps> = ({
 }) => {
     const [openKebabMenu, setOpenKebabMenu] = useState<string | null>(null);
     const [renamingNodeId, setRenamingNodeId] = useState<string | null>(null);
+    const [renamingText, setRenamingText] = useState('');
+    const [collapsedLayers, setCollapsedLayers] = useState(new Set<string>());
 
-    const handleRenameNode = (id: string, newName: string) => {
-        onUpdateNode(id, { customName: newName });
+    const handleStartRename = (nodeId: string, currentName: string) => {
+        setRenamingNodeId(nodeId);
+        setRenamingText(currentName);
+    };
+
+    const handleCommitRename = () => {
+        if (renamingNodeId && renamingText.trim()) {
+            onUpdateNode(renamingNodeId, { customName: renamingText });
+        }
         setRenamingNodeId(null);
+        setRenamingText('');
+    };
+    
+    const handleToggleCollapse = (nodeId: string) => {
+        setCollapsedLayers(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(nodeId)) {
+                newSet.delete(nodeId);
+            } else {
+                newSet.add(nodeId);
+            }
+            return newSet;
+        });
     };
 
     return (
@@ -94,9 +117,13 @@ const PagesAndLayersPanel: React.FC<PagesAndLayersPanelProps> = ({
                         device={device}
                         selectedNodeIds={selectedNodeIds}
                         renamingNodeId={renamingNodeId}
+                        renamingText={renamingText}
+                        collapsedLayers={collapsedLayers}
+                        onToggleCollapse={handleToggleCollapse}
                         onSelectNode={onSelectNode}
-                        onStartRename={setRenamingNodeId}
-                        onRenameNode={handleRenameNode}
+                        onStartRename={handleStartRename}
+                        onSetRenamingText={setRenamingText}
+                        onCommitRename={handleCommitRename}
                         onToggleVisibility={onToggleVisibility}
                         onDragStart={onDragStart}
                         onDragOver={onDragOver}

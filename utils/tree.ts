@@ -1,3 +1,4 @@
+
 import { v4 as uuidv4 } from 'uuid';
 import type { WebsiteNode, Section, Row, Column, Element, ResponsiveStyles, Page, FormField } from '../types';
 
@@ -192,6 +193,13 @@ export function deepCloneWithNewIds(node: any): any {
                 id: uuidv4(),
             }));
         }
+        // FIX: Added handling for Social Icons which was previously missing.
+        if (Array.isArray(newNode.content.networks)) {
+            newNode.content.networks = newNode.content.networks.map((network: any) => ({
+                ...network,
+                id: uuidv4(),
+            }));
+        }
     }
 
 
@@ -199,7 +207,6 @@ export function deepCloneWithNewIds(node: any): any {
 }
 
 // Finds a node, duplicates it, and inserts the copy next to the original.
-// FIX: Correctly handle duplication for root-level nodes (sections).
 export function duplicateNodeById(nodes: WebsiteNode[], id: string): boolean {
     for (let i = 0; i < nodes.length; i++) {
         const node = nodes[i];
@@ -255,6 +262,13 @@ const validChildrenMap: Record<string, string[]> = {
     column: ['headline', 'text', 'image', 'button', 'spacer', 'icon', 'video', 'form', 'embed', 'navigation', 'gallery', 'divider', 'map', 'accordion', 'tabs', 'socialIcons'],
 };
 
+// NEW: Export a function to check drop validity
+export function isDropAllowed(sourceType: string, targetParentType: string): boolean {
+    const allowedChildren = validChildrenMap[targetParentType];
+    return allowedChildren?.includes(sourceType) ?? false;
+}
+
+
 export const moveNode = (root: WebsiteNode[], sourceId: string, targetId: string, position: 'before' | 'after') => {
     if (sourceId === targetId) return;
 
@@ -266,8 +280,8 @@ export const moveNode = (root: WebsiteNode[], sourceId: string, targetId: string
     const { parent: sourceParent, node: sourceNode, index: sourceIndex } = sourceLocation;
     const { parent: targetParent, node: targetNode, index: targetIndex } = targetLocation;
 
-    const targetParentType = 'type' in targetParent ? targetParent.type : 'page';
-    if (!validChildrenMap[targetParentType]?.includes(sourceNode.type)) {
+    const targetParentType = 'type' in targetParent ? (targetParent as WebsiteNode).type : 'page';
+    if (!isDropAllowed(sourceNode.type, targetParentType)) {
         console.warn(`Cannot move ${sourceNode.type} into ${targetParentType}`);
         return; 
     }

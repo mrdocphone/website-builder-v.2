@@ -1,14 +1,16 @@
+
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
 interface SignupProps {
-  onSignupSuccess: (data: { type: 'user', username: string }) => void;
+  onSignupSuccess: (data: { type: 'user', username: string }, remember: boolean) => void;
 }
 
 const Signup: React.FC<SignupProps> = ({ onSignupSuccess }) => {
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(true); // FEAT: Added state for "Remember Me"
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
@@ -29,7 +31,7 @@ const Signup: React.FC<SignupProps> = ({ onSignupSuccess }) => {
 
         if (response.ok && data.success) {
             // Automatically log the user in upon successful signup
-            onSignupSuccess({ type: 'user', username: data.username });
+            onSignupSuccess({ type: 'user', username: data.username }, rememberMe);
         } else {
             setError(data.message || 'Failed to create account.');
         }
@@ -64,6 +66,12 @@ const Signup: React.FC<SignupProps> = ({ onSignupSuccess }) => {
             <label htmlFor="password" className="text-sm font-medium text-slate-700 block mb-2">Password</label>
             <input id="password" type="password" autoComplete="new-password" required value={password} onChange={(e) => setPassword(e.target.value)}
               className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" placeholder="••••••••"/>
+          </div>
+
+          {/* FEAT: Added "Remember Me" checkbox */}
+          <div className="flex items-center">
+            <input id="remember-me" type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-slate-300 rounded"/>
+            <label htmlFor="remember-me" className="ml-2 block text-sm text-slate-700">Remember me</label>
           </div>
 
           {error && <p className="text-sm text-red-600 text-center">{error}</p>}

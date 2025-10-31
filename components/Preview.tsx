@@ -49,7 +49,8 @@ const mergeStylesForDevice = (styles: ResponsiveStyles, device: Device): StylePr
 
 // FIX: Accordion now renders all items expanded in interactive mode for editing.
 const Accordion: React.FC<Omit<PreviewProps, 'websiteData' | 'activePage'> & { element: AccordionElement, theme: ThemeConfig, websiteData: WebsiteData, context: 'page' | 'header' | 'footer' }> = ({ element, interactive, ...props }) => {
-    const [openItem, setOpenItem] = useState<string | null>(!interactive ? element.content.items[0]?.id : null);
+    // FIX: Add null check for items[0] to prevent crash on empty accordion.
+    const [openItem, setOpenItem] = useState<string | null>(!interactive ? element.content.items?.[0]?.id : null);
     
     if (interactive) {
       return (
@@ -85,7 +86,7 @@ const Accordion: React.FC<Omit<PreviewProps, 'websiteData' | 'activePage'> & { e
                         {item.title}
                         <span>{(openItem === item.id ? '−' : '+')}</span>
                     </div>
-                    {openItem === item.id && <div className="preview-accordion-content">{item.content}</div>}
+                    {openItem === item.id && <div className="preview-accordion-content" dangerouslySetInnerHTML={{__html: item.content}} />}
                 </div>
             ))}
         </div>
@@ -149,6 +150,7 @@ const ElementRenderer: React.FC<{
 
     const handleContentChange = (newHtml: string) => {
         if (!interactive || !onUpdateNode) return;
+        // FIX: Critical data loss bug. Merged new text with existing content properties instead of overwriting.
         onUpdateNode(element.id, { content: { ...(element as any).content, text: newHtml } });
     };
   
@@ -437,7 +439,12 @@ const NodeRenderer: React.FC<Omit<PreviewProps, 'websiteData' | 'activePage'> & 
             mergedStyles.display = 'flex'; // Columns are flex containers for elements
             mergedStyles.flexDirection = mergedStyles.flexDirection || 'column'; // Default to column
              if ((node as Column).children.length === 0 && props.interactive) {
-                return <div className="p-4 min-h-[50px] w-full" style={mergedStyles}></div>
+                // FIX: Added a visible placeholder for empty columns in the editor for better UX.
+                return (
+                    <div className="p-4 min-h-[50px] w-full flex items-center justify-center text-center text-xs text-slate-400 bg-slate-50 border-2 border-dashed border-slate-300 rounded-md" style={mergedStyles}>
+                        Click to add elements here
+                    </div>
+                )
             }
             break;
     }

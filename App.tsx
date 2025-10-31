@@ -1,4 +1,5 @@
 
+
 // FIX: Corrected the invalid import syntax. `aistudio` was a typo and `useState` should be destructured.
 import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, Navigate, Outlet } from 'react-router-dom';
@@ -40,16 +41,22 @@ const AppContent: React.FC = () => {
         if (remember) {
             localStorage.setItem('session', JSON.stringify(newSession));
         } else {
+            // FIX: Ensure a session-only login clears any persistent "remember me" data.
+            localStorage.removeItem('session');
             sessionStorage.setItem('session', JSON.stringify(newSession));
         }
         setSession(newSession);
         navigate(data.type === 'admin' ? '/admin' : '/dashboard');
     };
     
-    const handleSignupSuccess = (data: { type: 'user'; username: string }) => {
+    const handleSignupSuccess = (data: { type: 'user'; username: string }, remember: boolean) => {
         const newSession: Session = { isAuthenticated: true, ...data };
-        // BUGFIX: Use localStorage for persistence after signup, matching "remember me" behavior.
-        localStorage.setItem('session', JSON.stringify(newSession));
+        // FIX: Signup now respects the "remember me" option for consistent login behavior.
+        if (remember) {
+            localStorage.setItem('session', JSON.stringify(newSession));
+        } else {
+            sessionStorage.setItem('session', JSON.stringify(newSession));
+        }
         setSession(newSession);
         navigate('/dashboard');
     }

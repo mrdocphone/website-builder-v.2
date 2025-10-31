@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+
+
+import React from 'react';
 import type { WebsiteNode, Device } from '../types';
 import { 
     EyeIcon, EyeSlashIcon, LockIcon, 
@@ -18,7 +20,8 @@ import {
     MapIcon,
     AccordionIcon,
     TabsIcon,
-    SocialIcon
+    SocialIcon,
+    PlusIcon // Placeholder for expander
 } from './icons';
 
 
@@ -50,9 +53,13 @@ interface LayerItemProps {
     device: Device;
     selectedNodeIds: string[];
     renamingNodeId: string | null;
+    renamingText: string;
+    collapsedLayers: Set<string>;
+    onToggleCollapse: (id: string) => void;
     onSelectNode: (id: string, e: React.MouseEvent) => void;
-    onStartRename: (id: string) => void;
-    onRenameNode: (id: string, newName: string) => void;
+    onStartRename: (id: string, currentName: string) => void;
+    onSetRenamingText: (text: string) => void;
+    onCommitRename: () => void;
     onToggleVisibility: (id: string) => void;
     onDragStart: (e: React.DragEvent, id: string) => void;
     onDragOver: (e: React.DragEvent, id: string) => void;
@@ -61,44 +68,41 @@ interface LayerItemProps {
     dropTarget: { targetId: string; position: 'top' | 'bottom' } | null;
 }
 
-const LayerItem: React.FC<LayerItemProps> = ({
-    node,
-    device,
-    selectedNodeIds,
-    renamingNodeId,
-    onSelectNode,
-    onStartRename,
-    onRenameNode,
-    onToggleVisibility,
-    onDragStart,
-    onDragOver,
-    onDragLeave,
-    onDrop,
-    dropTarget,
-}) => {
+const LayerItem: React.FC<LayerItemProps> = (props) => {
+    const {
+        node,
+        device,
+        selectedNodeIds,
+        renamingNodeId,
+        renamingText,
+        collapsedLayers,
+        onToggleCollapse,
+        onSelectNode,
+        onStartRename,
+        onSetRenamingText,
+        onCommitRename,
+        onToggleVisibility,
+        onDragStart,
+        onDragOver,
+        onDragLeave,
+        onDrop,
+        dropTarget,
+    } = props;
+
     const isSelected = selectedNodeIds.includes(node.id);
     const isRenaming = renamingNodeId === node.id;
-    const [name, setName] = useState(node.customName || node.type);
+    const hasChildren = 'children' in node && Array.isArray(node.children) && node.children.length > 0;
+    const isCollapsed = collapsedLayers.has(node.id);
     
-    // Sync local name state if node data changes from parent
-    React.useEffect(() => {
-        setName(node.customName || node.type);
-    }, [node.customName, node.type]);
-
-
     const handleDoubleClick = (e: React.MouseEvent) => {
         e.stopPropagation();
-        onStartRename(node.id);
+        onStartRename(node.id, node.customName || node.type);
     };
 
-    const handleBlur = () => {
-        onRenameNode(node.id, name);
-    };
-
-    const handleKeyDown = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter') {
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter' || e.key === 'Escape') {
             e.preventDefault();
-            handleBlur();
+            onCommitRename();
         }
     };
     
@@ -120,20 +124,25 @@ const LayerItem: React.FC<LayerItemProps> = ({
             {showDropIndicatorTop && <div className="drop-indicator-top"></div>}
             <div className={`layer-item ${isSelected ? 'selected' : ''}`} onClick={(e) => onSelectNode(node.id, e)}>
                 <div className="layer-item-content">
+                     {hasChildren ? (
+                        <button onClick={(e) => { e.stopPropagation(); onToggleCollapse(node.id); }} className={`layer-item-expander ${!isCollapsed ? 'expanded' : ''}`}>
+                            &#9656;
+                        </button>
+                    ) : <div className="w-4 h-4" /> }
                     <NodeIcon className="layer-item-icon" />
                     {isRenaming ? (
                         <input
                             type="text"
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            onBlur={handleBlur}
+                            value={renamingText}
+                            onChange={(e) => onSetRenamingText(e.target.value)}
+                            onBlur={onCommitRename}
                             onKeyDown={handleKeyDown}
                             autoFocus
                             className="bg-transparent outline-none w-full p-0 border-none focus:ring-0"
                             onClick={(e) => e.stopPropagation()}
                         />
                     ) : (
-                        <span className={`${!isVisibleOnDevice ? 'text-slate-400' : ''}`}>{node.customName || node.type}</span>
+                        <span className={`truncate ${!isVisibleOnDevice ? 'text-slate-400' : ''}`}>{node.customName || node.type}</span>
                     )}
                 </div>
                 <div className="flex items-center gap-2 text-slate-400">
@@ -143,10 +152,11 @@ const LayerItem: React.FC<LayerItemProps> = ({
                      </button>
                 </div>
             </div>
-            {'children' in node && Array.isArray(node.children) && node.children.length > 0 && (
+            {hasChildren && !isCollapsed && (
                 <div className="layer-children">
                     {node.children.map(child => (
-                        <LayerItem key={child.id} {...({node:child, device, selectedNodeIds, renamingNodeId, onSelectNode, onStartRename, onRenameNode, onToggleVisibility, onDragStart, onDragOver, onDragLeave, onDrop, dropTarget})} />
+                        // FIX: Correctly pass props to recursive component. `arguments` is not available in arrow functions.
+                        <LayerItem key={child.id} {...props} node={child} />
                     ))}
                 </div>
             )}

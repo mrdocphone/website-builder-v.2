@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -192,12 +193,14 @@
       .layer-item-wrapper { position: relative; }
       .layer-item { display: flex; align-items: center; padding: 6px 12px; cursor: pointer; font-size: 14px; border-radius: 4px; margin: 2px 0; position: relative; transition: background-color 0.2s; }
       .layer-item-content { display: flex; align-items: center; gap: 8px; flex-grow: 1; }
-      .layer-item-icon { width: 16px; height: 16px; color: #64748b; }
+      .layer-item-icon { width: 16px; height: 16px; color: #64748b; flex-shrink: 0; }
+      .layer-item-expander { width: 16px; height: 16px; color: #94a3b8; flex-shrink: 0; transition: transform 0.2s; }
+      .layer-item-expander.expanded { transform: rotate(90deg); }
       .layer-item.selected .layer-item-icon { color: var(--accent-color); }
       .layer-children { padding-left: 20px; border-left: 1px solid; margin-left: 8px; }
-      .drop-indicator-top::before, .drop-indicator-bottom::after { content: ''; position: absolute; left: 0; right: 0; height: 4px; background-color: var(--accent-color); opacity: 0.6; border-radius: 2px; z-index: 10; pointer-events: none; }
-      .drop-indicator-top::before { top: -2px; }
-      .drop-indicator-bottom::after { bottom: -2px; }
+      .drop-indicator-top, .drop-indicator-bottom { position: absolute; left: 0; right: 0; height: 4px; background-color: var(--accent-color); opacity: 0.6; border-radius: 2px; z-index: 10; pointer-events: none; }
+      .drop-indicator-top { top: -2px; }
+      .drop-indicator-bottom { bottom: -2px; }
       
       /* NEW: Pages & Layers Panel */
       .pages-list { padding: 8px; border-bottom: 1px solid var(--sidebar-border); }
@@ -226,6 +229,7 @@
       .global-color-swatch.selected { border-color: var(--accent-color); }
       .four-sided-control { display: grid; grid-template-columns: 1fr auto 1fr; gap: 4px; align-items: center; }
       .four-sided-control input { width: 100%; }
+      .style-input-label-inherited::before { content: ''; display: inline-block; width: 6px; height: 6px; background-color: #60a5fa; border-radius: 99px; margin-right: 6px; }
       /* NEW: Layout Picker */
       .layout-picker { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; }
       .layout-option { display: flex; gap: 4px; padding: 8px; border: 2px solid var(--sidebar-border); border-radius: 4px; cursor: pointer; }
@@ -242,9 +246,9 @@
       .add-element-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem; padding: 1rem; }
 
       /* Interactive Wrapper & Toolbar */
-      .interactive-wrapper { position: relative; transition: box-shadow 0.2s ease-in-out; }
-      .interactive-wrapper:hover:not(.selected) { box-shadow: 0 0 0 2px #a5b4fc; }
-      .interactive-wrapper.selected { box-shadow: 0 0 0 2px var(--accent-color); z-index: 10; }
+      .interactive-wrapper { position: relative; transition: outline-color 0.2s ease-in-out; outline: 2px solid transparent; outline-offset: -2px;}
+      .interactive-wrapper:hover:not(.selected) { outline-color: #a5b4fc; }
+      .interactive-wrapper.selected { outline-color: var(--accent-color); z-index: 10; }
       
       [contenteditable="true"] { outline: none; }
       .interactive-wrapper.selected [contenteditable="true"] { outline: 1px dashed var(--accent-color); outline-offset: 2px; }

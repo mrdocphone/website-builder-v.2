@@ -1,8 +1,9 @@
 
+
 // Vercel Serverless Function
 import { kv } from '@vercel/kv';
 import { v4 as uuidv4 } from 'uuid';
-import type { WebsiteData, Session, ResponsiveStyles, Page, WebsiteNode } from '../types';
+import type { WebsiteData, Session, ResponsiveStyles, Page, WebsiteNode, FormField } from '../types';
 
 export const config = {
   runtime: 'edge',
@@ -22,7 +23,7 @@ function deepCloneWebsite(website: WebsiteData): WebsiteData {
     const cloneNode = (node: any): any => {
         const newNode = { ...node, id: generateId(node.id) };
         
-        // Handle nested content structures like Tabs and Accordions
+        // Handle nested content structures like Tabs, Accordions, and Forms
         if (typeof newNode.content === 'object' && newNode.content !== null) {
             if (Array.isArray(newNode.content.items)) {
                  newNode.content.items = newNode.content.items.map((item: any) => {
@@ -32,6 +33,19 @@ function deepCloneWebsite(website: WebsiteData): WebsiteData {
                      }
                      return newItem;
                 });
+            }
+            if (Array.isArray(newNode.content.fields)) { // For Forms
+                newNode.content.fields = newNode.content.fields.map((field: FormField) => ({
+                    ...field,
+                    id: generateId(field.id),
+                }));
+            }
+            // FIX: Added handling for Social Icons which was previously missing.
+            if (Array.isArray(newNode.content.networks)) { // For Social Icons
+                newNode.content.networks = newNode.content.networks.map((network: any) => ({
+                    ...network,
+                    id: generateId(network.id),
+                }));
             }
         }
 
@@ -198,8 +212,8 @@ async function handleDelete(request: Request) {
     const websiteToDelete = await kv.get<WebsiteData>(`editor:${websiteId}`);
     if (websiteToDelete && websiteToDelete.pages) {
         // Check if this website contains the main homepage
-        const mainSiteData = await kv.get<{ page: Page }>(`site:${safeUsername}`);
-        const isHomepageInDeletedSite = mainSiteData && websiteToDelete.pages.some(p => p.id === mainSiteData.page.id);
+        const mainSiteData = await kv.get<{ pageId: string }>(`site:${safeUsername}`);
+        const isHomepageInDeletedSite = mainSiteData && websiteToDelete.pages.some(p => p.id === mainSiteData.pageId);
         
         // Delete all published pages for this site
         for (const page of websiteToDelete.pages) {
