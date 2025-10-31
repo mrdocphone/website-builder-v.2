@@ -1,3 +1,4 @@
+
 import { kv } from '@vercel/kv';
 
 export const config = {
@@ -18,18 +19,18 @@ export default async function handler(request: Request) {
             return new Response(JSON.stringify({ message: 'Username is required.' }), { status: 400 });
         }
         
-        // Find all published sub-pages for the user (e.g., site:user:about)
+        // Find all published sub-pages for the user (e.g., site-user-about)
         const subPageKeys: string[] = [];
         let cursor = 0;
         do {
-            // The match pattern finds all keys that start with "site:username:"
-            const [nextCursor, keys] = await kv.scan(cursor, { match: `site:${username}:*` });
+            // The match pattern finds all keys that start with "site-username-"
+            const [nextCursor, keys] = await kv.scan(cursor, { match: `site-${username}-*` });
             cursor = nextCursor;
             subPageKeys.push(...keys);
         } while (cursor !== 0);
 
-        // Also target the user's main page key (e.g., site:user)
-        const mainPageKey = `site:${username}`;
+        // Also target the user's main page key (e.g., site-user)
+        const mainPageKey = `site-${username}`;
         const allSiteKeysToDelete = [...subPageKeys, mainPageKey];
 
 

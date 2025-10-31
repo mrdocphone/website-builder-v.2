@@ -31,9 +31,9 @@ export default async function handler(request: Request) {
     const safeUsername = usernameParam.toLowerCase().replace(/[^a-z0-9-]/g, '');
     const safeSlug = slugParam ? slugParam.toLowerCase().replace(/[^a-z0-9-]/g, '') : null;
 
-    // If a slug is provided, fetch a specific sub-page (e.g., site:user:about).
-    // If no slug is provided, fetch the user's main page (e.g., site:user).
-    const key = safeSlug ? `site:${safeUsername}:${safeSlug}` : `site:${safeUsername}`;
+    // If a slug is provided, fetch a specific sub-page (e.g., site-user-about).
+    // If no slug is provided, fetch the user's main page (e.g., site-user).
+    const key = safeSlug ? `site-${safeUsername}-${safeSlug}` : `site-${safeUsername}`;
     const rawData = await kv.get(key);
     
     let websiteData: any = null;

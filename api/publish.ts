@@ -27,8 +27,8 @@ export default async function handler(request: Request) {
             return new Response(JSON.stringify({ message: 'The URL path (slug) cannot be empty.' }), { status: 400 });
         }
 
-        const key = `site:${safeUsername}:${safeSlug}`;
-        const mainKey = `site:${safeUsername}`;
+        const key = `site-${safeUsername}-${safeSlug}`;
+        const mainKey = `site-${safeUsername}`;
         
         // Ensure the data being saved contains the sanitized slug
         const dataToSave = { ...websiteData, slug: safeSlug };
