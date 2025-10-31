@@ -14,7 +14,7 @@ export default async function handler(request: Request) {
         if (!username) {
             return new Response(JSON.stringify({ message: 'Username is required.' }), { status: 400 });
         }
-        const data = await kv.get<WebsiteData>(`editor-data:${username}`);
+        const data = await kv.get<WebsiteData>(`editor:${username}`);
         if (data) {
             return new Response(JSON.stringify(data), { status: 200, headers: { 'Content-Type': 'application/json' } });
         }
@@ -25,7 +25,7 @@ export default async function handler(request: Request) {
         if (!username || !websiteData) {
             return new Response(JSON.stringify({ message: 'Username and website data are required.' }), { status: 400 });
         }
-        await kv.set(`editor-data:${username}`, JSON.stringify(websiteData));
+        await kv.set(`editor:${username}`, JSON.stringify(websiteData));
         return new Response(JSON.stringify({ success: true }), { status: 200 });
         
     } else {

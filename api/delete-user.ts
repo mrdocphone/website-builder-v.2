@@ -19,19 +19,16 @@ export default async function handler(request: Request) {
             return new Response(JSON.stringify({ message: 'Username is required.' }), { status: 400 });
         }
         
-        // Find all published sub-pages for the user (e.g., site-user-about)
-        const subPageKeys: string[] = [];
+        // Find all published site keys for the user (e.g., site:user and site:user/about)
+        const userSiteKeys: string[] = [];
         let cursor = 0;
         do {
-            // The match pattern finds all keys that start with "site-username-"
-            const [nextCursor, keys] = await kv.scan(cursor, { match: `site-${username}-*` });
+            // The match pattern finds all keys that start with "site:username",
+            // which includes the main page key and all sub-pages.
+            const [nextCursor, keys] = await kv.scan(cursor, { match: `site:${username}*` });
             cursor = nextCursor;
-            subPageKeys.push(...keys);
+            userSiteKeys.push(...keys);
         } while (cursor !== 0);
-
-        // Also target the user's main page key (e.g., site-user)
-        const mainPageKey = `site-${username}`;
-        const allSiteKeysToDelete = [...subPageKeys, mainPageKey];
 
 
         // Prepare deletion pipeline
@@ -41,14 +38,14 @@ export default async function handler(request: Request) {
         pipeline.del(`user:${username}`);
         
         // 2. Delete user's saved editor data
-        pipeline.del(`editor-data:${username}`);
+        pipeline.del(`editor:${username}`);
         
         // 3. Remove user from the master user list
         pipeline.srem('users', username);
 
         // 4. Delete all of the user's published sites if any keys were found
-        if (allSiteKeysToDelete.length > 0) {
-           pipeline.del(...allSiteKeysToDelete);
+        if (userSiteKeys.length > 0) {
+           pipeline.del(...userSiteKeys);
         }
 
         // Execute all deletions in a single transaction
