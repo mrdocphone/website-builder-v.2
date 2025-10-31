@@ -41,33 +41,40 @@ export function updateNodeById(nodes: WebsiteNode[], id: string, updates: Partia
     for (let i = 0; i < nodes.length; i++) {
         const node = nodes[i];
         if (node.id === id) {
-            // Refactored the update logic to prevent incorrect type compositions.
-            // Apply shallow updates first.
-            const updatedNode = { ...node, ...updates };
+            // Create a copy to avoid direct mutation issues with Immer proxies.
+            const updatedNode = { ...node };
 
-            // Then, handle deep merges for nested properties if they were part of the updates.
-            // This prevents the shallow spread from overwriting nested objects incorrectly.
-            if ('content' in updates && updates.content && 'content' in node && node.content) {
+            // Apply shallow updates for top-level properties.
+            Object.keys(updates).forEach(key => {
+                if (key !== 'styles' && key !== 'hoverStyles' && key !== 'content') {
+                    (updatedNode as any)[key] = (updates as any)[key];
+                }
+            });
+
+            // Deep merge content properties.
+            if (updates.content) {
                 (updatedNode as any).content = { ...node.content, ...updates.content };
             }
 
+            // Perform a robust deep merge for styles to prevent data loss.
             if (updates.styles) {
                 updatedNode.styles = {
-                    desktop: { ...node.styles.desktop, ...updates.styles.desktop },
-                    tablet: { ...node.styles.tablet, ...updates.styles.tablet },
-                    mobile: { ...node.styles.mobile, ...updates.styles.mobile },
+                    desktop: { ...node.styles.desktop, ...(updates.styles.desktop || {}) },
+                    tablet: { ...node.styles.tablet, ...(updates.styles.tablet || {}) },
+                    mobile: { ...node.styles.mobile, ...(updates.styles.mobile || {}) },
                 };
             }
             
+            // Perform a robust deep merge for hover styles.
             if (updates.hoverStyles) {
                 updatedNode.hoverStyles = {
-                    desktop: { ...(node.hoverStyles?.desktop || {}), ...updates.hoverStyles.desktop },
-                    tablet: { ...(node.hoverStyles?.tablet || {}), ...updates.hoverStyles.tablet },
-                    mobile: { ...(node.hoverStyles?.mobile || {}), ...updates.hoverStyles.mobile },
+                    desktop: { ...(node.hoverStyles?.desktop || {}), ...(updates.hoverStyles.desktop || {}) },
+                    tablet: { ...(node.hoverStyles?.tablet || {}), ...(updates.hoverStyles.tablet || {}) },
+                    mobile: { ...(node.hoverStyles?.mobile || {}), ...(updates.hoverStyles.mobile || {}) },
                 };
             }
 
-            nodes[i] = updatedNode as WebsiteNode;
+            nodes[i] = updatedNode;
             return true;
         }
         if ('children' in node && Array.isArray(node.children)) {

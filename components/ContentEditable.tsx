@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect, useCallback } from 'react';
 
 interface ContentEditableProps {
@@ -10,25 +11,25 @@ interface ContentEditableProps {
 
 const ContentEditable: React.FC<ContentEditableProps> = ({ html, onChange, tagName = 'div', className, ...props }) => {
     const elementRef = useRef<HTMLElement>(null);
-    const lastHtml = useRef<string>(html);
 
+    // This effect handles updates from the parent component (e.g., undo/redo, AI changes)
+    // It's the "downward" data flow from the application's state to the DOM.
     useEffect(() => {
-        // Update the DOM if the html prop changes from outside (e.g., AI update, undo/redo)
         if (elementRef.current && html !== elementRef.current.innerHTML) {
             elementRef.current.innerHTML = html;
         }
-        lastHtml.current = html;
     }, [html]);
 
+    // This callback handles user input inside the component. It's the "upward" data flow.
+    // It compares the live DOM content with the last known state from props.
     const handleInput = useCallback(() => {
         if (elementRef.current) {
             const newHtml = elementRef.current.innerHTML;
-            if (newHtml !== lastHtml.current) {
-                lastHtml.current = newHtml;
+            if (newHtml !== html) {
                 onChange(newHtml);
             }
         }
-    }, [onChange]);
+    }, [onChange, html]); // Dependency on `html` is crucial for comparing against the correct state.
 
     // BUGFIX: Sanitize pasted content to prevent style conflicts and broken HTML.
     const handlePaste = useCallback((e: React.ClipboardEvent) => {
@@ -37,7 +38,7 @@ const ContentEditable: React.FC<ContentEditableProps> = ({ html, onChange, tagNa
         document.execCommand('insertText', false, text);
     }, []);
     
-    // FIX: Intercept the Enter key to enforce consistent line breaks.
+    // FIX: Intercept the Enter key to enforce consistent line breaks across browsers.
     const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
         // Make 'Enter' consistently create a line break to prevent inconsistent browser behavior (e.g., creating <div>s).
         if (e.key === 'Enter' && !e.shiftKey) {

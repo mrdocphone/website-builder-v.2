@@ -54,7 +54,7 @@ const useHistoryState = <T,>(initialState: T) => {
 
     const undo = () => { if (currentIndex > 0) setCurrentIndex(prev => prev - 1); };
     // FIX: Redo was incorrectly decrementing the index instead of incrementing it.
-    const redo = () => { if (currentIndex < history.length - 1) setCurrentIndex(prev => prev - 1); };
+    const redo = () => { if (currentIndex < history.length - 1) setCurrentIndex(prev => prev + 1); };
 
     return {
         state: history[currentIndex]?.state,
@@ -322,10 +322,9 @@ const Editor: React.FC<{session: Session}> = ({ session }) => {
   };
   
   // Wrapped setState to handle dirty flag
-  const updateWebsiteData = (action: (draft: WebsiteData) => void | WebsiteData, message: string) => {
-    setWebsiteData(draft => {
-        if (draft) return action(draft) as any;
-    }, message);
+  // FIX: Simplified the state update function to prevent bugs with page creation, settings, etc.
+  const updateWebsiteData = (producer: (draft: WebsiteData) => void | WebsiteData, message: string) => {
+    setWebsiteData(producer, message);
     setIsDirty(true);
     setSaveStatus('Unsaved changes');
   }
@@ -427,9 +426,15 @@ const Editor: React.FC<{session: Session}> = ({ session }) => {
     } else {
         setSelectedNodeIds([id]);
     }
-    setActiveTab('style');
   }, []);
   
+  // FIX: Make Style tab open automatically and reliably on selection.
+  useEffect(() => {
+    if (selectedNodeIds.length > 0) {
+      setActiveTab('style');
+    }
+  }, [selectedNodeIds]);
+
   const handleMoveNode = useCallback((sourceId: string, targetId: string, position: 'top' | 'bottom') => {
       updateWebsiteData(draft => {
           const tree = editingContext === 'page' ? draft.pages.find(p => p.id === activePageId)?.children : draft[editingContext];
@@ -449,20 +454,20 @@ const Editor: React.FC<{session: Session}> = ({ session }) => {
     const handleCreatePage = () => {
         const name = prompt("Enter new page name:", "New Page");
         if (!name) return;
+        const newPage: Page = {
+            id: uuidv4(),
+            name,
+            slug: name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
+            isHomepage: false,
+            children: [],
+            heroImageUrl: 'https://images.unsplash.com/photo-1487017159836-4e23ece2e4cf?q=80&w=2071&auto=format&fit=crop',
+            tagline: 'A brand new page'
+        };
         updateWebsiteData(draft => {
-            const newPage: Page = {
-                id: uuidv4(),
-                name,
-                slug: name.toLowerCase().replace(/\s+/g, '-'),
-                isHomepage: false,
-                children: [],
-                heroImageUrl: 'https://images.unsplash.com/photo-1487017159836-4e23ece2e4cf?q=80&w=2071&auto=format&fit=crop',
-                tagline: 'A brand new page'
-            };
             draft.pages.push(newPage);
-            setActivePageId(newPage.id);
-            setSelectedNodeIds([]);
         }, "Create Page");
+        setActivePageId(newPage.id);
+        setSelectedNodeIds([]);
     };
 
     const handleDuplicatePage = (pageId: string) => {
@@ -690,7 +695,7 @@ const Editor: React.FC<{session: Session}> = ({ session }) => {
         </main>
       </div>
       {isPublishModalOpen && session.username && <PublishModal username={session.username} websiteData={websiteData} onClose={() => setIsPublishModalOpen(false)} onPublishSuccess={(d) => { /* Can update state if needed */ }} />}
-      {editingPage && <PageSettingsModal page={editingPage} onClose={() => setEditingPage(null)} onSave={(updates) => updateWebsiteData(draft => { const p = draft.pages.find(p => p.id === editingPage.id); if (p) Object.assign(p, updates); }, 'Update page settings')} />}
+      {editingPage && <PageSettingsModal page={editingPage} onClose={() => setEditingPage(null)} onSave={(updates) => updateWebsiteData(draft => { const p = draft.pages.find(p => p.id === editingPage!.id); if (p) Object.assign(p, updates); }, 'Update page settings')} />}
        {isAssetManagerOpen && <AssetManager websiteData={websiteData} onClose={() => setIsAssetManagerOpen(false)} onUpdateAssets={(newAssets) => updateWebsiteData(draft => { draft.assets = newAssets; }, 'Update Assets')} onSelectAsset={(url) => { if (selectedNode) { handleUpdateNode(selectedNode.id, { styles: { desktop: { backgroundImage: `url(${url})` }, tablet: {}, mobile: {}}}); setIsAssetManagerOpen(false); } }} />}
       {contextMenu && <ContextMenu x={contextMenu.x} y={contextMenu.y} nodeId={contextMenu.nodeId} onClose={handleCloseContextMenu} onDuplicate={() => handleDuplicateNode(contextMenu.nodeId)} onDelete={() => handleDeleteNode(contextMenu.nodeId)} onCopyStyles={() => handleCopyStyles(contextMenu.nodeId)} onPasteStyles={() => handlePasteStyles(contextMenu.nodeId)} onCopyNode={() => handleCopyNode(contextMenu.nodeId)} onPasteNode={() => handlePasteNode(contextMenu.nodeId)} onToggleLock={() => handleToggleLock(contextMenu.nodeId)} canPasteStyles={!!copiedStyles} canPasteNode={!!copiedNode} node={findNodeById(contentTree || [], contextMenu.nodeId)} />}
       <CommandPalette isOpen={isCommandPaletteOpen} onClose={() => setIsCommandPaletteOpen(false)} commands={commandPaletteCommands} />
