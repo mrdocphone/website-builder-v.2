@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import type { WebsiteData } from '../types';
 import { PlusIcon, TrashIcon, XIcon } from './icons';

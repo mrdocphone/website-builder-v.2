@@ -1,4 +1,3 @@
-
 import type { WebsiteData, Section, Element, Page } from '../types';
 
 /**

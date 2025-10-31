@@ -1,4 +1,3 @@
-
 import React, { useMemo, useState } from 'react';
 import type { WebsiteData, ThemeConfig, Theme, WebsiteNode, Element as IElement, HeadlineElement, TextElement, ImageElement, ButtonElement, VideoElement, IconElement, Column, Device, ResponsiveStyles, StyleProperties, EmbedElement, FormElement, Page, NavigationElement, GalleryElement, DividerElement, MapElement, AccordionElement, TabsElement, SocialIconsElement, FormField, NavLink } from '../types';
 import { PlusIcon, availableIcons, IconRenderer as Icon, MagicWandIcon } from './icons';

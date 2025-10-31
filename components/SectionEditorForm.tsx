@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import type { WebsiteNode, Device, StyleProperties, Element, IconElement, WebsiteData, FormElement, EmbedElement, GalleryElement, SocialIconsElement, FormField, VideoElement, AccordionElement, TabsElement, Row, Column, NavigationElement, NavLink, Page } from '../types';
 import { availableIcons, IconRenderer, DesktopIcon, TabletIcon, MobileIcon, EyeIcon, EyeSlashIcon, PlusIcon, TrashIcon, DragHandleIcon, PencilIcon, GridIcon, AnimationIcon, CheckboxIcon, SelectIcon, TextColorIcon, LayoutIcon, XIcon, ChainLinkIcon, UnlinkIcon } from './icons';
@@ -303,7 +302,12 @@ const StylePanel: React.FC<StylePanelProps> = ({ node, nodePath, websiteData, on
             case 'button': return (<StyleInput label="Link URL" value={content.href || ''} onChange={val => handleContentChange('href', val)} />);
             case 'video': return (<>
                 <StyleInput label="Video URL" value={content.src || ''} onChange={val => handleContentChange('src', val)} />
-                <div className="space-y-1 text-sm mt-2"><label className="flex items-center gap-2"><input type="checkbox" checked={!!content.autoplay} onChange={e => handleContentChange('autoplay', e.target.checked)} /> Autoplay</label></div>
+                <div className="space-y-1 text-sm mt-2">
+                    <label className="flex items-center gap-2"><input type="checkbox" checked={!!content.autoplay} onChange={e => handleContentChange('autoplay', e.target.checked)} /> Autoplay</label>
+                    <label className="flex items-center gap-2"><input type="checkbox" checked={!!content.loop} onChange={e => handleContentChange('loop', e.target.checked)} /> Loop</label>
+                    <label className="flex items-center gap-2"><input type="checkbox" checked={!!content.muted} onChange={e => handleContentChange('muted', e.target.checked)} /> Muted</label>
+                    <label className="flex items-center gap-2"><input type="checkbox" checked={content.controls !== false} onChange={e => handleContentChange('controls', e.target.checked)} /> Show Controls</label>
+                </div>
             </>);
             case 'icon': {
                 const isIconValid = content.name && availableIcons[content.name];
@@ -351,11 +355,14 @@ const StylePanel: React.FC<StylePanelProps> = ({ node, nodePath, websiteData, on
                 )
             }
             case 'tabs': {
-                 const items = (node as TabsElement).content.items || [];
-                 return (
+                const items = (node as TabsElement).content.items || [];
+                const defaultTextElement: Element = { id: uuidv4(), type: 'text', styles: { desktop: {}, tablet: {}, mobile: {} }, content: { text: "New tab content." } };
+                const defaultColumn: Column = { id: uuidv4(), type: 'column', styles: { desktop: {}, tablet: {}, mobile: {} }, children: [defaultTextElement] };
+                const handleAddTab = () => handleContentChange('items', [...items, {id: uuidv4(), title: 'New Tab', content: [defaultColumn]}]);
+                return (
                     <div>
                         {items.map((item, index) => <div key={item.id} className="p-2 border rounded mb-2"><input value={item.title} onChange={e => handleContentChange('items', items.map((it, i) => i === index ? {...it, title: e.target.value} : it))} className="w-full p-1 border rounded text-sm mb-1" placeholder="Tab Title"/></div>)}
-                        <button onClick={() => handleContentChange('items', [...items, {id: uuidv4(), title: 'New Tab', content: []}])} className="text-indigo-600 text-sm font-semibold flex items-center gap-1"><PlusIcon className="w-4 h-4"/> Add Tab</button>
+                        <button onClick={handleAddTab} className="text-indigo-600 text-sm font-semibold flex items-center gap-1"><PlusIcon className="w-4 h-4"/> Add Tab</button>
                     </div>
                 )
             }
@@ -385,6 +392,23 @@ const StylePanel: React.FC<StylePanelProps> = ({ node, nodePath, websiteData, on
                     </div>
                     <button onClick={() => handleContentChange('fields', [...fields, {id: uuidv4(), type: 'text', label: 'New Field'}])} className="mt-2 text-indigo-600 text-sm font-semibold flex items-center gap-1"><PlusIcon className="w-4 h-4"/> Add Field</button>
                  </div>)
+            }
+            case 'socialIcons': {
+                const networks = (node as SocialIconsElement).content.networks || [];
+                const handleNetworkChange = (index: number, field: 'network' | 'url', value: any) => handleContentChange('networks', networks.map((n, i) => i === index ? { ...n, [field]: value } : n));
+                const handleRemoveNetwork = (index: number) => handleContentChange('networks', networks.filter((_, i) => i !== index));
+                const handleAddNetwork = () => handleContentChange('networks', [...networks, {id: uuidv4(), network: 'twitter', url: ''}]);
+
+                return (<div className="space-y-2">
+                    {networks.map((network, index) => (
+                         <div key={network.id} className="p-3 border rounded bg-white space-y-2">
+                            <div className="flex justify-between items-center"><span className="font-medium text-sm">Icon {index + 1}</span><button onClick={() => handleRemoveNetwork(index)} className="p-1 hover:bg-red-50 rounded"><TrashIcon className="w-4 h-4 text-red-500"/></button></div>
+                            <StyleInput label="Network" value={network.network} onChange={val => handleNetworkChange(index, 'network', val)} type="select" options={[{value:'facebook',label:'Facebook'}, {value:'twitter',label:'Twitter'}, {value:'instagram',label:'Instagram'}, {value:'linkedin',label:'LinkedIn'}]} />
+                            <StyleInput label="URL" value={network.url} onChange={val => handleNetworkChange(index, 'url', val)} />
+                         </div>
+                    ))}
+                    <button onClick={handleAddNetwork} className="mt-2 text-indigo-600 text-sm font-semibold flex items-center gap-1"><PlusIcon className="w-4 h-4"/> Add Icon</button>
+                </div>)
             }
             default: return <p className="text-sm text-center text-slate-400 p-4">No content to edit.</p>;
         }

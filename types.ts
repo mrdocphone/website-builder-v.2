@@ -1,4 +1,3 @@
-
 export type Theme = 'light' | 'dark' | 'ocean' | 'forest';
 export type Device = 'desktop' | 'tablet' | 'mobile';
 

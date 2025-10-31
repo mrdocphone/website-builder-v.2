@@ -1,4 +1,3 @@
-
 import React, { useRef, useEffect, useCallback } from 'react';
 
 interface ContentEditableProps {
@@ -38,10 +37,21 @@ const ContentEditable: React.FC<ContentEditableProps> = ({ html, onChange, tagNa
         document.execCommand('insertText', false, text);
     }, []);
     
-    // FIX: Intercept the Enter key to enforce consistent line breaks across browsers.
+    // FIX: Intercept the Enter key to enforce consistent line breaks, but allow default behavior for lists.
     const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-        // Make 'Enter' consistently create a line break to prevent inconsistent browser behavior (e.g., creating <div>s).
         if (e.key === 'Enter' && !e.shiftKey) {
+            const selection = window.getSelection();
+            if (selection && selection.rangeCount > 0) {
+                let container = selection.getRangeAt(0).commonAncestorContainer;
+                // Traverse up the DOM to see if we are inside an LI tag
+                while (container && container.nodeName !== 'BODY') {
+                    if (container.nodeName === 'LI') {
+                        return; // Allow default behavior for lists
+                    }
+                    container = container.parentNode!;
+                }
+            }
+            // If not in a list, enforce consistent line breaks
             e.preventDefault();
             document.execCommand('insertHTML', false, '<br><br>');
         }

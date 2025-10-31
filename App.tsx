@@ -1,5 +1,3 @@
-
-
 // FIX: Corrected the invalid import syntax. `aistudio` was a typo and `useState` should be destructured.
 import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, Navigate, Outlet } from 'react-router-dom';

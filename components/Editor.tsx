@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { produce } from 'immer';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -581,13 +580,24 @@ const Editor: React.FC<{session: Session}> = ({ session }) => {
   const handleDragLeave = () => setDropTarget(null);
   const handleDrop = (e: React.DragEvent) => { e.preventDefault(); if (draggedNodeId && dropTarget) handleMoveNode(draggedNodeId, dropTarget.targetId, dropTarget.position); setDraggedNodeId(null); setDropTarget(null); };
 
-  // NEW: Multi-select alignment logic
+  // FIX: Multi-select alignment now correctly applies styles to the current device and merges instead of overwriting.
   const handleAlign = (alignment: 'flex-start' | 'center' | 'flex-end' | 'stretch') => {
     updateWebsiteData(draft => {
         const tree = editingContext === 'page' ? draft.pages.find(p => p.id === activePageId)?.children : draft[editingContext];
         if (!tree) return;
         selectedNodeIds.forEach(id => {
-            updateNodeById(tree, id, { styles: { desktop: { alignSelf: alignment }, tablet: {}, mobile: {} } });
+            const node = findNodeById(tree, id);
+            if (node) {
+                const currentStyles = node.styles || { desktop: {}, tablet: {}, mobile: {} };
+                const newStyles = {
+                    ...currentStyles,
+                    [device]: {
+                        ...(currentStyles[device] || {}),
+                        alignSelf: alignment
+                    }
+                };
+                updateNodeById(tree, id, { styles: newStyles });
+            }
         });
     }, `Align items ${alignment}`);
   };
