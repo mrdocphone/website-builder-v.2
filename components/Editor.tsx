@@ -16,7 +16,6 @@ import AssetManager from './AssetManager';
 import PagesAndLayersPanel from './PagesAndLayersPanel'; // This is now the Left Sidebar
 import { useDynamicStyles } from '../hooks/useDynamicStyles';
 
-// FIX: Defined the missing type 'EditingContext'.
 type EditingContext = 'page' | 'header' | 'footer';
 
 // Custom hook for state management with undo/redo
@@ -46,7 +45,8 @@ const useHistoryState = <T,>(initialState: T) => {
     }
 
     const undo = () => { if (currentIndex > 0) setCurrentIndex(prev => prev - 1); };
-    const redo = () => { if (currentIndex < history.length - 1) setCurrentIndex(prev => prev - 1); };
+    // FIX: Redo should increment the index, not decrement it.
+    const redo = () => { if (currentIndex < history.length - 1) setCurrentIndex(prev => prev + 1); };
 
     return {
         state: history[currentIndex]?.state,

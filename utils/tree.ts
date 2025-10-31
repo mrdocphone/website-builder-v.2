@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import type { WebsiteNode, Section, Row, Column, Element, ResponsiveStyles, Page, FormField } from '../types';
+import type { WebsiteNode, Section, Row, Column, Element, ResponsiveStyles, Page, FormField, NavLink, SocialIconsElement } from '../types';
 
 // Recursive function to find a node by its ID
 export function findNodeById(nodes: WebsiteNode[], id: string): WebsiteNode | null {
@@ -122,7 +122,7 @@ export const createDefaultElement = (type: Element['type']): Element => {
         case 'video': return { ...base, type: 'video', content: { src: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', controls: true } };
         case 'form': return { ...base, type: 'form', content: { buttonText: 'Submit', fields: [ { id: uuidv4(), type: 'text', label: 'Name', required: true}, { id: uuidv4(), type: 'email', label: 'Email', required: true } ] } };
         case 'embed': return { ...base, type: 'embed', content: { html: '<p class="p-4 bg-slate-100 rounded text-center">Your embedded content will show here.</p>' } };
-        case 'navigation': return { ...base, type: 'navigation', content: {} };
+        case 'navigation': return { ...base, type: 'navigation', content: { links: [] } };
         case 'gallery': return { ...base, type: 'gallery', content: { images: [ { src: 'https://images.unsplash.com/photo-1599420186946-7b6fb4e297f0?q=80&w=1887', alt: 'Placeholder 1'}, { src: 'https://images.unsplash.com/photo-1581093450021-4a7360e9a1c8?q=80&w=1887', alt: 'Placeholder 2'}, { src: 'https://images.unsplash.com/photo-1518770660439-4636190af475?q=80&w=2070', alt: 'Placeholder 3'}, { src: 'https://images.unsplash.com/photo-1620712943543-2858200f7426?q=80&w=2070', alt: 'Placeholder 4'} ]} };
         case 'divider': return { ...base, type: 'divider', content: {}, styles: { desktop: { height: '1px', backgroundColor: '#cbd5e1', marginTop: '1rem', marginBottom: '1rem' }, tablet: {}, mobile: {} } };
         case 'map': return { ...base, type: 'map', content: { embedUrl: 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3022.610224424263!2d-73.98785368459384!3d40.74844097932824!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x89c259a9b3117469%3A0xd134e199a405a163!2sEmpire%20State%20Building!5e0!3m2!1sen!2sus!4v1676231998539!5m2!1sen!2sus' } };
@@ -199,10 +199,15 @@ export function deepCloneWithNewIds(node: any): any {
                 id: uuidv4(),
             }));
         }
-        // FIX: Added handling for Social Icons which was previously missing.
-        if (Array.isArray(newNode.content.networks)) {
-            newNode.content.networks = newNode.content.networks.map((network: any) => ({
+        if (Array.isArray(newNode.content.networks)) { // For Social Icons
+            newNode.content.networks = newNode.content.networks.map((network: SocialIconsElement['content']['networks'][0]) => ({
                 ...network,
+                id: uuidv4(),
+            }));
+        }
+        if (Array.isArray(newNode.content.links)) { // For Navigation
+             newNode.content.links = newNode.content.links.map((link: NavLink) => ({
+                ...link,
                 id: uuidv4(),
             }));
         }
