@@ -1,5 +1,4 @@
 
-
 import React, { useMemo } from 'react';
 import type { WebsiteData, ThemeConfig, Theme, WebsiteNode, Element as IElement, HeadlineElement, TextElement, ImageElement, ButtonElement, VideoElement, IconElement, Column, Device, ResponsiveStyles, StyleProperties, EmbedElement, FormElement, Page } from '../types';
 import { PlusIcon, availableIcons, IconRenderer as Icon } from './icons';
@@ -18,6 +17,7 @@ interface PreviewProps {
   onUpdateNode?: (id: string, updates: Partial<WebsiteNode>) => void;
   onAiTextUpdate?: (nodeId: string, action: string, options?: { tone?: string }) => void;
   isAiLoading?: boolean;
+  onContextMenuRequest?: (e: React.MouseEvent, nodeId: string) => void;
 }
 
 const themeConfigs: Record<Theme, ThemeConfig> = {
@@ -152,7 +152,8 @@ const InteractiveWrapper: React.FC<React.PropsWithChildren<{
     onUpdateNode?: (id: string, updates: Partial<WebsiteNode>) => void;
     onAiTextUpdate?: (nodeId: string, action: string, options?: { tone?: string }) => void;
     isAiLoading?: boolean;
-}>> = ({ children, node, interactive, isSelected, isHovered, onSelect, onHover, onUpdateNode, onAiTextUpdate, isAiLoading }) => {
+    onContextMenuRequest?: (e: React.MouseEvent, nodeId: string) => void;
+}>> = ({ children, node, interactive, isSelected, isHovered, onSelect, onHover, onUpdateNode, onAiTextUpdate, isAiLoading, onContextMenuRequest }) => {
     if (!interactive) {
         return <>{children}</>;
     }
@@ -171,6 +172,14 @@ const InteractiveWrapper: React.FC<React.PropsWithChildren<{
         e.stopPropagation();
         onHover?.(null);
     };
+    
+    const handleContextMenu = (e: React.MouseEvent) => {
+        if (!interactive || !onContextMenuRequest) return;
+        e.preventDefault();
+        e.stopPropagation();
+        onContextMenuRequest(e, node.id);
+    };
+
 
     const wrapperClasses = [
         'interactive-wrapper',
@@ -187,6 +196,7 @@ const InteractiveWrapper: React.FC<React.PropsWithChildren<{
             onClick={handleClick}
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
+            onContextMenu={handleContextMenu}
         >
             {isSelected && isAiTextElement && onAiTextUpdate && (
                 <AiToolbar 
