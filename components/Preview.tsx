@@ -525,6 +525,7 @@ const Preview: React.FC<PreviewProps> = (props) => {
   const theme = useMemo(() => themeConfigs[websiteData.theme] || themeConfigs.light, [websiteData.theme]);
   const fontFamilyStyle = websiteData.googleFont ? { fontFamily: `'${websiteData.googleFont}', sans-serif` } : {};
 
+  const hasPageContent = activePage.children && activePage.children.length > 0;
 
   return (
     <div className={`w-full h-full overflow-y-auto ${theme.bg} ${theme.text} transition-colors duration-300`} style={fontFamilyStyle}>
@@ -537,23 +538,17 @@ const Preview: React.FC<PreviewProps> = (props) => {
         </header>
       }
 
-      {/* Hero for the current page */}
-      {!props.interactive && (
-        <section className="relative h-72">
-          <img src={activePage.heroImageUrl} alt={`${activePage.name} hero image`} className="w-full h-full object-cover" />
-          <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center p-6">
-            <div className="text-center">
-              <h2 className="text-4xl font-extrabold text-white">{activePage.name}</h2>
-              <p className="mt-2 text-lg text-slate-200">{activePage.tagline}</p>
-            </div>
-          </div>
-        </section>
-      )}
-
       <main>
-        {activePage.children && activePage.children.filter(Boolean).map(section => (
+        {hasPageContent ? activePage.children.filter(Boolean).map(section => (
             <NodeRenderer key={section.id} {...props} node={section} theme={theme} context="page" />
-        ))}
+        )) : (
+             <div className="flex items-center justify-center min-h-[400px]">
+                <div className="text-center p-8 border-2 border-dashed rounded-lg">
+                    <h3 className="text-lg font-semibold">This page is empty</h3>
+                    <p className="text-sm text-slate-500 mt-2">Add a section from the Layers panel to get started.</p>
+                </div>
+            </div>
+        )}
       </main>
 
       {websiteData.footer.length > 0 &&
@@ -561,12 +556,6 @@ const Preview: React.FC<PreviewProps> = (props) => {
             {websiteData.footer.map(section => (
                 <NodeRenderer key={section.id} {...props} node={section} theme={theme} context="footer" />
             ))}
-        </footer>
-      }
-
-      {!websiteData.footer.length &&
-        <footer className={`py-6 px-6 text-center ${theme.footerBg} ${theme.footerText}`}>
-          <p>&copy; {new Date().getFullYear()} {websiteData.name}. All rights reserved.</p>
         </footer>
       }
     </div>
