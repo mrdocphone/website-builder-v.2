@@ -15,9 +15,11 @@ const PageSettingsModal: React.FC<PageSettingsModalProps> = ({ page, onClose, on
     const [metaTitle, setMetaTitle] = useState(page.metaTitle || '');
     const [metaDescription, setMetaDescription] = useState(page.metaDescription || '');
     const [ogImageUrl, setOgImageUrl] = useState(page.ogImageUrl || '');
+    const [customHeadCode, setCustomHeadCode] = useState(page.customHeadCode || '');
+    const [customBodyCode, setCustomBodyCode] = useState(page.customBodyCode || '');
 
     const handleSave = () => {
-        onSave({ name, slug, isDraft, password, metaTitle, metaDescription, ogImageUrl });
+        onSave({ name, slug, isDraft, password, metaTitle, metaDescription, ogImageUrl, customHeadCode, customBodyCode });
         onClose();
     };
 
@@ -69,6 +71,19 @@ const PageSettingsModal: React.FC<PageSettingsModalProps> = ({ page, onClose, on
                          <div>
                             <label className="text-sm font-medium text-slate-600 block mb-1">Social Share Image URL</label>
                             <input type="text" value={ogImageUrl} onChange={e => setOgImageUrl(e.target.value)} className="w-full p-2 border rounded"/>
+                        </div>
+                    </div>
+
+                    {/* Custom Code */}
+                    <div className="p-4 border rounded">
+                         <h3 className="font-semibold mb-2">Custom Code</h3>
+                         <div>
+                            <label className="text-sm font-medium text-slate-600 block mb-1">Custom Head Code</label>
+                            <textarea value={customHeadCode} onChange={e => setCustomHeadCode(e.target.value)} className="w-full p-2 border rounded h-24 font-mono text-xs" placeholder="e.g. <style> or <script> tags for this page's <head>"/>
+                        </div>
+                        <div>
+                            <label className="text-sm font-medium text-slate-600 block mb-1">Custom Body Code</label>
+                            <textarea value={customBodyCode} onChange={e => setCustomBodyCode(e.target.value)} className="w-full p-2 border rounded h-24 font-mono text-xs" placeholder="e.g. <script> tags to add before the closing </body> tag"/>
                         </div>
                     </div>
                 </div>

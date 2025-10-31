@@ -27,16 +27,13 @@ export default async function handler(request: Request) {
         
         const publishablePages = websiteData.pages.filter(p => !p.isDraft);
         const newPublishedSlugs = new Set(publishablePages.map(p => p.slug));
+        
+        // NEW: Update timestamp on publish
+        websiteData.lastUpdatedAt = new Date().toISOString();
 
         const pipeline = kv.pipeline();
 
         // 1. Process all publishable pages
-        let homepage = publishablePages.find(p => p.isHomepage);
-        if (!homepage && publishablePages.length > 0) {
-            homepage = publishablePages[0];
-            // Do not mutate original data, but ensure the homepage logic works
-        }
-
         for (const page of publishablePages) {
             const safeSlug = page.slug.toLowerCase().replace(/[^a-z0-9-]/g, '');
             if (!safeSlug) continue;
@@ -44,17 +41,8 @@ export default async function handler(request: Request) {
             const pageKey = `site:${safeUsername}/${safeSlug}`;
             pipeline.set(pageKey, JSON.stringify({ site: websiteData, page }));
         }
-
-        // 2. Set the main site entry point (homepage)
-        if (homepage) {
-            const mainKey = `site:${safeUsername}`;
-            pipeline.set(mainKey, JSON.stringify({ site: websiteData, page: homepage }));
-        } else {
-             // If there are no publishable pages, delete the root entry
-            pipeline.del(`site:${safeUsername}`);
-        }
-
-        // 3. Delete pages that were published before but are no longer
+        
+        // 2. Delete pages that were published before but are now drafted/deleted
         for (const oldSlug of oldPublishedSlugs) {
             if (typeof oldSlug !== 'string') continue;
             if (!newPublishedSlugs.has(oldSlug)) {
@@ -63,13 +51,29 @@ export default async function handler(request: Request) {
                 pipeline.del(keyToDelete);
             }
         }
+
+        // 3. Set the main site entry point (homepage)
+        // BUGFIX: Logic is updated to prevent site from going down if homepage is unpublished.
+        let newHomepage = publishablePages.find(p => p.isHomepage);
+        // If the designated homepage is drafted, or none is set, find the first available published page.
+        if (!newHomepage && publishablePages.length > 0) {
+            newHomepage = publishablePages[0];
+        }
+
+        if (newHomepage) {
+            const mainKey = `site:${safeUsername}`;
+            pipeline.set(mainKey, JSON.stringify({ site: websiteData, page: newHomepage }));
+        } else {
+             // Only delete the root entry if there are NO publishable pages left.
+            pipeline.del(`site:${safeUsername}`);
+        }
         
         // 4. Update the editor's source of truth
         pipeline.set(editorDataKey, JSON.stringify(websiteData));
 
         await pipeline.exec();
 
-        const successUrl = homepage ? `/${safeUsername}/${homepage.slug}` : `/${safeUsername}`;
+        const successUrl = newHomepage ? `/${safeUsername}/${newHomepage.slug}` : `/${safeUsername}`;
 
         return new Response(JSON.stringify({ success: true, url: successUrl }), {
             status: 200,

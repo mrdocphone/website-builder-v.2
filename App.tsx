@@ -1,3 +1,4 @@
+
 // FIX: Corrected the invalid import syntax. `aistudio` was a typo and `useState` should be destructured.
 import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, Navigate, Outlet } from 'react-router-dom';
@@ -47,7 +48,8 @@ const AppContent: React.FC = () => {
     
     const handleSignupSuccess = (data: { type: 'user'; username: string }) => {
         const newSession: Session = { isAuthenticated: true, ...data };
-        sessionStorage.setItem('session', JSON.stringify(newSession));
+        // BUGFIX: Use localStorage for persistence after signup, matching "remember me" behavior.
+        localStorage.setItem('session', JSON.stringify(newSession));
         setSession(newSession);
         navigate('/dashboard');
     }

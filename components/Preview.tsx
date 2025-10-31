@@ -1,3 +1,4 @@
+
 import React, { useMemo, useState } from 'react';
 import type { WebsiteData, ThemeConfig, Theme, WebsiteNode, Element as IElement, HeadlineElement, TextElement, ImageElement, ButtonElement, VideoElement, IconElement, Column, Device, ResponsiveStyles, StyleProperties, EmbedElement, FormElement, Page, NavigationElement, GalleryElement, DividerElement, MapElement, AccordionElement, TabsElement, SocialIconsElement, FormField } from '../types';
 import { PlusIcon, availableIcons, IconRenderer as Icon } from './icons';
@@ -45,17 +46,17 @@ const mergeStylesForDevice = (styles: ResponsiveStyles, device: Device): StylePr
 
 
 // NEW: Accordion Preview Component
-const Accordion: React.FC<{ element: AccordionElement }> = ({ element }) => {
+const Accordion: React.FC<{ element: AccordionElement, interactive?: boolean }> = ({ element, interactive }) => {
     const [openItem, setOpenItem] = useState<string | null>(null);
     return (
         <div className="preview-accordion">
             {element.content.items.map(item => (
                 <div key={item.id} className="preview-accordion-item">
-                    <div className="preview-accordion-title" onClick={() => setOpenItem(openItem === item.id ? null : item.id)}>
+                    <div className="preview-accordion-title" onClick={() => !interactive && setOpenItem(openItem === item.id ? null : item.id)}>
                         {item.title}
-                        <span>{openItem === item.id ? '-' : '+'}</span>
+                        <span>{interactive ? '−' : (openItem === item.id ? '−' : '+')}</span>
                     </div>
-                    {openItem === item.id && <div className="preview-accordion-content">{item.content}</div>}
+                    {(interactive || openItem === item.id) && <div className="preview-accordion-content">{item.content}</div>}
                 </div>
             ))}
         </div>
@@ -63,8 +64,28 @@ const Accordion: React.FC<{ element: AccordionElement }> = ({ element }) => {
 };
 
 // NEW: Tabs Preview Component
-const Tabs: React.FC<{ element: TabsElement; onUpdateNode?: PreviewProps['onUpdateNode'], interactive?: boolean }> = ({ element, ...props }) => {
+const Tabs: React.FC<Omit<PreviewProps, 'websiteData' | 'activePage'> & { element: TabsElement; theme: ThemeConfig, websiteData: WebsiteData, context: 'page' | 'header' | 'footer' }> = ({ element, interactive, ...props }) => {
     const [activeTab, setActiveTab] = useState(element.content.items[0]?.id || null);
+
+    if (interactive) {
+        return (
+            <div className="preview-tabs">
+                {element.content.items.map((item, index) => (
+                    <div key={item.id}>
+                        <div className="p-2 bg-slate-100 font-semibold text-sm text-slate-600 rounded-t-md mt-4">
+                           Tab {index + 1}: {item.title}
+                        </div>
+                        <div className="preview-tab-content border-l border-r border-b rounded-b-md">
+                            {item.content.map(child => (
+                                <NodeRenderer key={child.id} node={child} {...props} />
+                            ))}
+                        </div>
+                    </div>
+                ))}
+            </div>
+        )
+    }
+
     const activeItem = element.content.items.find(item => item.id === activeTab);
     return (
         <div className="preview-tabs">
@@ -77,7 +98,7 @@ const Tabs: React.FC<{ element: TabsElement; onUpdateNode?: PreviewProps['onUpda
             </div>
             <div className="preview-tab-content">
                 {activeItem?.content.map(child => (
-                    <NodeRenderer key={child.id} node={child} theme={themeConfigs.light} context="page" {...props} />
+                    <NodeRenderer key={child.id} node={child} {...props} />
                 ))}
             </div>
         </div>
@@ -91,7 +112,8 @@ const ElementRenderer: React.FC<{
     websiteData: WebsiteData,
     interactive?: boolean;
     onUpdateNode?: (id: string, updates: Partial<WebsiteNode>) => void;
-}> = React.memo(({ element, theme, websiteData, interactive, onUpdateNode }) => {
+    [key: string]: any; // Catch-all for other preview props
+}> = React.memo(({ element, theme, websiteData, interactive, onUpdateNode, ...props }) => {
     if (!element.content || typeof element.content !== 'object') {
          if (element.type !== 'divider' && element.type !== 'navigation' && element.type !== 'spacer') return null;
     }
@@ -227,8 +249,8 @@ const ElementRenderer: React.FC<{
                 </div>
             )
         }
-        case 'accordion': return <Accordion element={element as AccordionElement} />;
-        case 'tabs': return <Tabs element={element as TabsElement} onUpdateNode={onUpdateNode} interactive={interactive} />;
+        case 'accordion': return <Accordion element={element as AccordionElement} interactive={interactive} />;
+        case 'tabs': return <Tabs element={element as TabsElement} interactive={interactive} {...props} />;
         case 'socialIcons': {
             const { networks } = element.content as SocialIconsElement['content'];
             return (
@@ -277,7 +299,6 @@ const InteractiveWrapper: React.FC<React.PropsWithChildren<{
         onHover?.(null);
     };
     
-    // FIX: Add a null check on rightClickedNode before accessing its properties.
     const handleContextMenu = (e: React.MouseEvent) => {
         if (!interactive || !onContextMenuRequest) return;
         e.preventDefault();
@@ -355,7 +376,7 @@ const NodeRenderer: React.FC<Omit<PreviewProps, 'websiteData' | 'activePage'> & 
       return (
         <InteractiveWrapper {...props} node={node} isSelected={isSelected} isHovered={isHovered}>
             <div style={mergedStyles}>
-                <ElementRenderer element={node as IElement} theme={theme} websiteData={props.websiteData} interactive={props.interactive} onUpdateNode={props.onUpdateNode} />
+                <ElementRenderer element={node as IElement} theme={theme} websiteData={props.websiteData} interactive={props.interactive} onUpdateNode={props.onUpdateNode} {...props} />
             </div>
         </InteractiveWrapper>
       );

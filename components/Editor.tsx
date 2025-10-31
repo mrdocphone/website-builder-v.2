@@ -2,20 +2,19 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { produce } from 'immer';
 import { useParams, useNavigate } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
-// FIX: Import duplicateNodeById.
 import type { WebsiteData, WebsiteNode, Section, Session, ElementType, Device, ResponsiveStyles, Element, Page } from '../types';
-import { findNodeById, updateNodeById, removeNodeById, addNode, moveNode, duplicateNodeById, findNodePath } from '../utils/tree';
+import { findNodeById, updateNodeById, removeNodeById, addNode, moveNode, duplicateNodeById, findNodePath, deepCloneWithNewIds, addNodeNextTo } from '../utils/tree';
 import { generateSectionContent } from '../services/geminiService';
 import GlobalSettingsForm from './GlobalSettingsForm';
 import StylePanel from './SectionEditorForm';
 import Preview from './Preview';
 import PublishModal from './PublishModal';
-// FIX: Import DuplicateIcon.
 import { DesktopIcon, TabletIcon, MobileIcon, LayersIcon, PlusIcon as ComponentIcon, SettingsIcon, PencilIcon, TrashIcon, VideoIcon, StarIcon, CheckIcon, HeartIcon, UndoIcon, RedoIcon, CopyIcon, PasteIcon, FormIcon, EmbedIcon, MagicWandIcon, HomeIcon, PageSettingsIcon, DuplicateIcon, ColumnIcon, LockIcon, UnlockIcon, LayoutIcon, SunIcon, MoonIcon, CommandIcon, AssetIcon, WireframeIcon, HistoryIcon } from './icons';
 import ContextMenu from './ContextMenu';
 import SectionTemplatesPanel from './SectionTemplatesPanel';
 import PageSettingsModal from './PageSettingsModal';
 import AssetManager from './AssetManager';
+import LayerItem from './LayerItem';
 
 type DropPosition = 'top' | 'bottom';
 type EditingContext = 'page' | 'header' | 'footer';
@@ -51,6 +50,7 @@ const useHistoryState = <T,>(initialState: T) => {
     }
 
     const undo = () => { if (currentIndex > 0) setCurrentIndex(prev => prev - 1); };
+    // BUGFIX: The redo function was incorrectly decrementing the index. Changed `prev - 1` to `prev + 1`.
     const redo = () => { if (currentIndex < history.length - 1) setCurrentIndex(prev => prev + 1); };
 
     return {
@@ -65,6 +65,20 @@ const useHistoryState = <T,>(initialState: T) => {
         currentIndex,
         jumpToState,
     };
+};
+
+// NEW: Debounce hook for performance optimization
+const useDebounce = <T,>(value: T, delay: number): T => {
+    const [debouncedValue, setDebouncedValue] = useState<T>(value);
+    useEffect(() => {
+        const handler = setTimeout(() => {
+            setDebouncedValue(value);
+        }, delay);
+        return () => {
+            clearTimeout(handler);
+        };
+    }, [value, delay]);
+    return debouncedValue;
 };
 
 
@@ -124,65 +138,6 @@ const EditorTopBar: React.FC<{
 };
 
 // ... LayersPanel, AddPanel etc ...
-const LayerItem: React.FC<{
-    node: WebsiteNode;
-    selectedNodeIds: string[];
-    onSelectNode: (id: string, e: React.MouseEvent) => void;
-    onRenameNode: (id: string, newName: string) => void;
-    [key: string]: any; // for other props
-}> = ({ node, selectedNodeIds, onSelectNode, onRenameNode, ...rest }) => {
-    const isSelected = selectedNodeIds.includes(node.id);
-    const [isRenaming, setIsRenaming] = useState(false);
-    const [name, setName] = useState(node.customName || node.type);
-
-    const handleDoubleClick = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        setIsRenaming(true);
-    };
-
-    const handleBlur = () => {
-        setIsRenaming(false);
-        onRenameNode(node.id, name);
-    };
-
-    const handleKeyDown = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter') {
-            handleBlur();
-        }
-    };
-
-    // FIX: Stop propagation on double click to prevent it from also triggering selection.
-    return (
-        <div className="layer-item-wrapper" onDoubleClick={handleDoubleClick}>
-            <div className={`layer-item ${isSelected ? 'selected' : ''}`} onClick={(e) => onSelectNode(node.id, e)}>
-                <div className="layer-item-content">
-                    <span className="layer-item-icon">&#x25A1;</span>
-                    {isRenaming ? (
-                        <input
-                            type="text"
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            onBlur={handleBlur}
-                            onKeyDown={handleKeyDown}
-                            autoFocus
-                            className="bg-transparent outline-none w-full"
-                            onClick={(e) => e.stopPropagation()}
-                        />
-                    ) : (
-                        <span>{node.customName || node.type}</span>
-                    )}
-                </div>
-            </div>
-            {'children' in node && Array.isArray(node.children) && node.children.length > 0 && (
-                <div className="layer-children">
-                    {node.children.map(child => (
-                        <LayerItem key={child.id} node={child as WebsiteNode} selectedNodeIds={selectedNodeIds} onSelectNode={onSelectNode} onRenameNode={onRenameNode} {...rest} />
-                    ))}
-                </div>
-            )}
-        </div>
-    );
-};
 const AddPanel: React.FC<{ onAddElement: (type: ElementType) => void }> = ({ onAddElement }) => {
   const elements: { type: ElementType, label: string, icon: React.FC<any> }[] = [ { type: 'headline', label: 'Headline', icon: PencilIcon }, { type: 'text', label: 'Text', icon: PencilIcon }, { type: 'button', label: 'Button', icon: PencilIcon }, { type: 'image', label: 'Image', icon: PencilIcon }, { type: 'spacer', label: 'Spacer', icon: CheckIcon }, { type: 'video', label: 'Video', icon: VideoIcon }, { type: 'icon', label: 'Icon', icon: StarIcon }, { type: 'form', label: 'Form', icon: FormIcon }, { type: 'embed', label: 'Embed', icon: EmbedIcon }, { type: 'navigation', label: 'Navigation', icon: MagicWandIcon }, { type: 'gallery', label: 'Gallery', icon: MagicWandIcon }, { type: 'divider', label: 'Divider', icon: MagicWandIcon }, { type: 'map', label: 'Map', icon: MagicWandIcon }, { type: 'accordion', label: 'Accordion', icon: MagicWandIcon }, { type: 'tabs', label: 'Tabs', icon: MagicWandIcon }, { type: 'socialIcons', label: 'Social Icons', icon: MagicWandIcon }];
   return ( <div className="add-element-grid"> {elements.map(el => ( <button key={el.type} onClick={() => onAddElement(el.type)} className="add-element-button"> <el.icon className="w-6 h-6" /> <span>{el.label}</span> </button> ))} </div> );
@@ -194,6 +149,7 @@ const AddPanel: React.FC<{ onAddElement: (type: ElementType) => void }> = ({ onA
 const Editor: React.FC<{session: Session}> = ({ session }) => {
   const { websiteId } = useParams<{ websiteId: string }>();
   const { state: websiteData, setState: setWebsiteData, setInitialState: setInitialWebsiteData, undo, redo, canUndo, canRedo, history, currentIndex, jumpToState } = useHistoryState<WebsiteData | null>(null);
+  const debouncedWebsiteData = useDebounce(websiteData, 1500);
   
   const [activePageId, setActivePageId] = useState<string | null>(null);
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
@@ -307,24 +263,28 @@ const Editor: React.FC<{session: Session}> = ({ session }) => {
   const selectedNode = contentTree && selectedNodeIds.length === 1 ? findNodeById(contentTree, selectedNodeIds[0]) : null;
 
 
-  const saveTimer = useRef<number | null>(null);
+  // Debounced save effect
   useEffect(() => {
-    if (websiteData) {
-      if (saveTimer.current) clearTimeout(saveTimer.current);
-      setIsSaving(true);
-      saveTimer.current = window.setTimeout(async () => {
+    // Do not save on initial load or if there's no data
+    if (!debouncedWebsiteData || history.length <= 1) return;
+
+    const performSave = async () => {
+        setIsSaving(true);
         try {
-          await fetch('/api/editor-data', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ websiteId, websiteData }) });
-          setLastSaved(new Date());
+            await fetch('/api/editor-data', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ websiteId, websiteData: debouncedWebsiteData })
+            });
+            setLastSaved(new Date());
         } catch (e) {
-          console.error("Failed to save:", e);
+            console.error("Failed to save:", e);
         } finally {
-          setIsSaving(false);
+            setIsSaving(false);
         }
-      }, 1500);
-    }
-    return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
-  }, [websiteData, websiteId]);
+    };
+    performSave();
+  }, [debouncedWebsiteData, websiteId, history.length]);
   
   const handleUpdateNode = useCallback((id: string, updates: Partial<WebsiteNode>) => {
     setWebsiteData(draft => {
@@ -455,8 +415,8 @@ const Editor: React.FC<{session: Session}> = ({ session }) => {
           if (!draft) return;
           const tree = editingContext === 'page' ? draft.pages.find(p => p.id === activePageId)?.children : draft[editingContext];
           if (tree) {
-             // This is a simplified paste - it just duplicates the node under the same parent
-             duplicateNodeById(tree, targetNodeId); // Re-using duplicate logic is simplest here
+             const nodeToPaste = deepCloneWithNewIds(copiedNode);
+             addNodeNextTo(tree, targetNodeId, nodeToPaste, 'after');
           }
       }, `Paste Node`);
   };
@@ -486,6 +446,7 @@ const Editor: React.FC<{session: Session}> = ({ session }) => {
       }
       setGeneratingSectionId(sectionId);
       try {
+          // BUGFIX: Pass `activePage.tagline` instead of non-existent `websiteData.tagline`
           const generatedColumns = await generateSectionContent(websiteData, activePage.tagline, sectionNode);
           handleUpdateNode(sectionId, { 
               children: sectionNode.children.map((row, rowIndex) => ({
@@ -608,7 +569,7 @@ const Editor: React.FC<{session: Session}> = ({ session }) => {
                      ))}
                      </div>
                      <hr className="my-2" />
-                     {contentTree?.map(child => <LayerItem key={child.id} node={child} selectedNodeIds={selectedNodeIds} onSelectNode={handleSelectNode} onRenameNode={handleRenameNode} />)}
+                     {contentTree?.map(child => <LayerItem key={child.id} node={child} device={device} selectedNodeIds={selectedNodeIds} onSelectNode={handleSelectNode} onRenameNode={handleRenameNode} />)}
                 </div>
              )}
              {activeTab === 'add' && <AddPanel onAddElement={handleAddElement} />}
@@ -663,8 +624,10 @@ const Editor: React.FC<{session: Session}> = ({ session }) => {
             onPasteStyles={() => handlePasteStyles(contextMenu.nodeId)}
             onCopyNode={() => handleCopyNode(contextMenu.nodeId)}
             onPasteNode={() => handlePasteNode(contextMenu.nodeId)}
+            onToggleLock={() => handleToggleLock(contextMenu.nodeId)}
             canPasteStyles={!!copiedStyles}
             canPasteNode={!!copiedNode}
+            node={findNodeById(contentTree || [], contextMenu.nodeId)}
           />
       )}
     </div>

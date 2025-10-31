@@ -77,7 +77,9 @@ const createDefaultWebsite = (id: string, name: string): WebsiteData => {
         colors: [],
         typography: [],
     },
-    pages: [homePage]
+    pages: [homePage],
+    lastUpdatedAt: new Date().toISOString(),
+    tags: [],
   };
 };
 

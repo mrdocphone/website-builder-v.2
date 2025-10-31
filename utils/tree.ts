@@ -225,19 +225,26 @@ interface NodeLocation {
   index: number;
 }
 // Finds a node and its parent container. The root is represented as a simple object with a `children` property.
-const findNodeAndParent = (root: WebsiteNode[], id: string): NodeLocation | null => {
-    for (let i = 0; i < root.length; i++) {
-        const node = root[i];
-        if (node.id === id) {
-            return { parent: { children: root }, node, index: i };
-        }
-        if ('children' in node && Array.isArray(node.children)) {
-            const found = findNodeAndParent(node.children as WebsiteNode[], id);
-            if (found) return found;
+export const findNodeAndParent = (root: WebsiteNode[], id: string): NodeLocation | null => {
+    const parentStack: ((WebsiteNode & { children: any[] }) | { children: WebsiteNode[] })[] = [{ children: root }];
+
+    while (parentStack.length > 0) {
+        const currentParent = parentStack.pop()!;
+        if (!currentParent.children) continue;
+
+        for (let i = 0; i < currentParent.children.length; i++) {
+            const node = currentParent.children[i];
+            if (node.id === id) {
+                return { parent: currentParent, node, index: i };
+            }
+            if ('children' in node && Array.isArray(node.children)) {
+                parentStack.push(node as any);
+            }
         }
     }
     return null;
 }
+
 
 // Defines what node types can be dropped into which parent types.
 const validChildrenMap: Record<string, string[]> = {
@@ -278,4 +285,19 @@ export const moveNode = (root: WebsiteNode[], sourceId: string, targetId: string
 
     // 3. Insert node at the new position
     targetParent.children.splice(newIndex, 0, sourceNode);
+};
+
+
+// NEW: Immer-compatible function to add a node next to another node
+export const addNodeNextTo = (root: WebsiteNode[], targetId: string, nodeToInsert: WebsiteNode, position: 'before' | 'after' = 'after') => {
+    const targetLocation = findNodeAndParent(root, targetId);
+    if (!targetLocation) {
+        console.error("Target node for insertion not found.");
+        return false;
+    }
+    
+    const { parent: targetParent, index: targetIndex } = targetLocation;
+    const newIndex = position === 'before' ? targetIndex : targetIndex + 1;
+    targetParent.children.splice(newIndex, 0, nodeToInsert);
+    return true;
 };

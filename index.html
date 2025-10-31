@@ -55,6 +55,15 @@
         --accent-color-dark: #3730a3;
         --danger-color: #dc2626;
         --danger-color-light: #fee2e2;
+
+        /* NEW: Dashboard variables */
+        --dashboard-bg: #f8fafc;
+        --dashboard-header-bg: #ffffff;
+        --dashboard-card-bg: #ffffff;
+        --dashboard-card-border: #e2e8f0;
+        --dashboard-text-primary: #0f172a;
+        --dashboard-text-secondary: #64748b;
+        --dashboard-text-tertiary: #94a3b8;
       }
       .dark-mode {
         --editor-bg: #0f172a;
@@ -64,6 +73,16 @@
         --text-color-secondary: #94a3b8;
         --accent-color-light: #312e81;
       }
+      .dashboard.dark {
+        --dashboard-bg: #0f172a;
+        --dashboard-header-bg: #1e293b;
+        --dashboard-card-bg: #1e293b;
+        --dashboard-card-border: #334155;
+        --dashboard-text-primary: #f1f5f9;
+        --dashboard-text-secondary: #94a3b8;
+        --dashboard-text-tertiary: #64748b;
+      }
+
       .editor-container { background-color: var(--editor-bg); color: var(--text-color-primary); }
       .editor-sidebar { background-color: var(--sidebar-bg); border-right-color: var(--sidebar-border); }
       .editor-top-bar { background-color: var(--sidebar-bg); border-bottom-color: var(--sidebar-border); }
@@ -246,6 +265,7 @@
       /* NEW: Wireframe Mode */
       .wireframe-mode * { background-color: transparent !important; background-image: none !important; color: #64748b !important; border: 1px dashed #94a3b8 !important; }
       .wireframe-mode img, .wireframe-mode video, .wireframe-mode iframe { opacity: 0.2; }
+      .wireframe-mode hr { height: 1px !important; background-color: transparent !important; }
 
       /* Published Site Styles */
       [data-animation] { opacity: 0; transition: opacity 0.7s ease-out, transform 0.7s ease-out; }
@@ -272,10 +292,23 @@
       .preview-tab-content { padding: 1.5rem; }
 
       /* General UI Helpers */
-      .dashboard-center-state { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 4rem 1rem; border: 2px dashed #e2e8f0; border-radius: 0.5rem; }
+      .dashboard-center-state { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 4rem 1rem; border: 2px dashed var(--dashboard-card-border); border-radius: 0.5rem; }
       .dashboard-spinner { width: 2rem; height: 2rem; border-width: 3px; border-color: var(--accent-color); border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite; }
       @keyframes spin { to { transform: rotate(360deg); } }
 
+      /* NEW: Dashboard Redesign Styles */
+      .dashboard-main { background-color: var(--dashboard-bg); color: var(--dashboard-text-primary); }
+      .dashboard-header { background-color: var(--dashboard-header-bg); border-bottom: 1px solid var(--dashboard-card-border); }
+      .website-card { background-color: var(--dashboard-card-bg); border: 1px solid var(--dashboard-card-border); }
+      .website-card-preview { background-color: #f1f5f9; }
+      .status-dot { width: 8px; height: 8px; border-radius: 99px; }
+      .kebab-menu { position: relative; }
+      .kebab-menu-dropdown { position: absolute; top: calc(100% + 4px); right: 0; background-color: var(--dashboard-card-bg); border: 1px solid var(--dashboard-card-border); z-index: 50; }
+      .settings-modal-overlay { background-color: rgba(0,0,0,0.5); z-index: 100; }
+      .settings-modal { background-color: var(--dashboard-bg); }
+      .settings-modal-header { background-color: var(--dashboard-header-bg); border-bottom: 1px solid var(--dashboard-card-border); }
+      .settings-modal-sidebar button.active { background-color: var(--accent-color-light); color: var(--accent-color-dark); }
+      .settings-modal-footer { background-color: var(--dashboard-header-bg); border-top: 1px solid var(--dashboard-card-border); }
     </style>
   <script type="importmap">
 {

@@ -290,6 +290,16 @@ export interface WebsiteData {
   };
   assets: { id: string, name: string, url: string }[];
   pages: Page[];
+  // NEW: Fields for dashboard
+  lastUpdatedAt?: string;
+  tags?: string[];
+  // Mock data for UI demonstration
+  analytics?: {
+      views: number;
+      visitors: number;
+  };
+  seoScore?: number;
+  formSubmissions?: number;
 }
 
 

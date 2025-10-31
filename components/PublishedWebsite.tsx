@@ -1,4 +1,4 @@
-// FIX: Import `useCallback` from react.
+
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import type { WebsiteData, Page, WebsiteNode } from '../types';
@@ -19,7 +19,7 @@ const findHoverStyles = (nodes: WebsiteNode[]): { id: string; styles: any }[] =>
     return styles;
 };
 
-const PasswordPrompt: React.FC<{ onSubmit: (password: string) => void }> = ({ onSubmit }) => {
+const PasswordPrompt: React.FC<{ onSubmit: (password: string) => void; hasError: boolean; }> = ({ onSubmit, hasError }) => {
     const [password, setPassword] = useState('');
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -27,9 +27,17 @@ const PasswordPrompt: React.FC<{ onSubmit: (password: string) => void }> = ({ on
     };
     return (
         <div className="w-screen h-screen flex items-center justify-center bg-slate-100">
-            <form onSubmit={handleSubmit} className="p-8 bg-white rounded-lg shadow-md">
-                <h2 className="text-lg font-semibold mb-4">Password Required</h2>
-                <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full p-2 border rounded mb-4" />
+            <form onSubmit={handleSubmit} className="p-8 bg-white rounded-lg shadow-md w-full max-w-sm">
+                <h2 className="text-lg font-semibold mb-4 text-center">Password Required</h2>
+                {hasError && <p className="text-sm text-red-600 mb-3 text-center">Incorrect password. Please try again.</p>}
+                <input
+                  type="password"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  className="w-full p-2 border rounded mb-4"
+                  placeholder="Enter page password"
+                  autoFocus
+                />
                 <button type="submit" className="w-full bg-indigo-600 text-white p-2 rounded">Submit</button>
             </form>
         </div>
@@ -44,6 +52,7 @@ const PublishedWebsite: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [passwordRequired, setPasswordRequired] = useState(false);
+  const [passwordError, setPasswordError] = useState(false);
 
   const fetchWebsiteData = useCallback(async (password?: string) => {
       if (!username) {
@@ -81,9 +90,13 @@ const PublishedWebsite: React.FC = () => {
 
           if (parsedData.passwordRequired) {
               setPasswordRequired(true);
+              if (password) { // If a password was provided and it's still required, it was wrong.
+                  setPasswordError(true);
+              }
           } else {
               setWebsiteData(parsedData.site);
               setPageData(parsedData.page);
+              setPasswordError(false);
           }
 
       } catch (e) {
@@ -231,7 +244,7 @@ const PublishedWebsite: React.FC = () => {
   }
   
   if (passwordRequired) {
-      return <PasswordPrompt onSubmit={(password) => fetchWebsiteData(password)} />;
+      return <PasswordPrompt onSubmit={(password) => fetchWebsiteData(password)} hasError={passwordError} />;
   }
 
   if (!websiteData || !pageData) {
