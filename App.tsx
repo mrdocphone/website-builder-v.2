@@ -7,7 +7,6 @@ import AdminDashboardLayout, { DashboardWelcome } from './components/AdminDashbo
 import UserManagementDashboard from './components/UserManagementDashboard';
 import Signup from './components/Signup';
 import type { Session } from './types';
-import Editor from './components/Editor';
 import WebsiteDashboard from './components/WebsiteDashboard';
 
 const getInitialSession = (): Session => {
@@ -117,7 +116,6 @@ const AppContent: React.FC = () => {
             {/* User Protected Routes */}
             <Route element={<UserRouteProtection />}>
                 <Route path="/dashboard" element={<WebsiteDashboard onLogout={handleLogout} session={session} />} />
-                <Route path="/editor/:websiteId" element={<Editor session={session} />} />
             </Route>
             
             {/* --- Published Site Routes (Catch-all) --- */}

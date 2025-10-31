@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import type { Session, WebsiteData, Page } from '../types';
 import WebsiteSettingsModal from './WebsiteSettingsModal';
 import { 
-    LogoutIcon, PencilIcon, LinkIcon, PlusIcon, TrashIcon, DuplicateIcon, 
+    LogoutIcon, LinkIcon, PlusIcon, TrashIcon, DuplicateIcon, 
     MoreVerticalIcon, GlobeIcon, SettingsIcon, CheckCircleIcon, CloudOffIcon, 
     SearchIcon, GridIcon, ListIcon, SunIcon, MoonIcon, TrendingUpIcon, TagIcon,
     UsersIcon
@@ -73,7 +73,8 @@ const WebsiteDashboard: React.FC<{ onLogout: () => void, session: Session }> = (
                 });
                 const newWebsite = await res.json();
                 if (res.ok) {
-                    navigate(`/editor/${newWebsite.id}`);
+                    // Refresh the list instead of navigating to a now-nonexistent editor
+                    await fetchWebsites();
                 } else {
                     alert(newWebsite.message || "Could not create website.");
                 }
@@ -258,9 +259,6 @@ const WebsiteCard: React.FC<{site: WebsiteData, session: Session, onAction: Func
             <div className="website-card-preview relative aspect-[16/9] w-full rounded-t-lg overflow-hidden group">
                 <img src={homepage?.heroImageUrl} className="w-full h-full object-cover"/>
                 <div className="absolute inset-0 bg-black bg-opacity-20"></div>
-                 <button onClick={() => navigate(`/editor/${site.id}`)} className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all text-white opacity-0 group-hover:opacity-100">
-                    <PencilIcon className="w-6 h-6 mr-2"/> Edit Site
-                 </button>
             </div>
             <div className="p-4 flex-grow flex flex-col">
                 <div className="flex justify-between items-start">
@@ -314,7 +312,6 @@ const WebsiteListItem: React.FC<{site: WebsiteData, session: Session, onAction: 
             </div>
             <div className="hidden lg:block text-sm text-gray-500">Last updated: {new Date(site.lastUpdatedAt || Date.now()).toLocaleDateString()}</div>
             <div className="flex items-center gap-2">
-                <button onClick={() => navigate(`/editor/${site.id}`)} className="px-3 py-1.5 text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">Edit</button>
                 <ActionMenu site={site} onAction={onAction} onSettings={onSettings} status={status} />
             </div>
         </div>
