@@ -1,6 +1,7 @@
 
 
 
+
 // FIX: Corrected the invalid import syntax. `aistudio` was a typo and `useState` should be destructured.
 import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, Navigate, Outlet } from 'react-router-dom';
@@ -158,8 +159,7 @@ const AppContent: React.FC = () => {
             
             {/* --- Published Site Routes (Catch-all) --- */}
             {/* These routes are last to act as a fallback for any path that isn't a defined application route. */}
-            <Route path="/:username/:slug" element={<PublishedWebsite />} />
-            <Route path="/:username" element={<PublishedWebsite />} />
+            <Route path="/:username/:slug?" element={<PublishedWebsite />} />
         </Routes>
     );
 };
