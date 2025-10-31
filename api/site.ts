@@ -49,7 +49,7 @@ export default async function handler(request: Request) {
         websiteData = rawData;
     }
 
-    if (websiteData && typeof websiteData === 'object' && websiteData.businessName && Array.isArray(websiteData.children)) {
+    if (websiteData && typeof websiteData === 'object' && websiteData.name && Array.isArray(websiteData.children)) {
         return new Response(JSON.stringify(websiteData), { 
             status: 200, 
             headers: { 'Content-Type': 'application/json' } 
