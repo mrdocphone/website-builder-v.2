@@ -1,13 +1,16 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import type { WebsiteData } from '../types';
+import type { WebsiteData, Page } from '../types';
 import Preview from './Preview';
 
 
 const PublishedWebsite: React.FC = () => {
   const { username, slug } = useParams<{ username: string; slug?: string }>();
+  // The API now returns the full WebsiteData object which includes the specific page data.
   const [websiteData, setWebsiteData] = useState<WebsiteData | null>(null);
+  const [pageData, setPageData] = useState<Page | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -39,10 +42,8 @@ const PublishedWebsite: React.FC = () => {
             }
 
             const parsedData = await response.json();
-            
-            // The data is now validated on the server-side.
-            // If we receive a 200 OK, we can assume the data format is correct.
-            setWebsiteData(parsedData);
+            setWebsiteData(parsedData.site);
+            setPageData(parsedData.page);
             
 
         } catch (e) {
@@ -58,20 +59,16 @@ const PublishedWebsite: React.FC = () => {
   }, [username, slug]);
   
   useEffect(() => {
-    if (websiteData) {
-        // Set Title
-        document.title = websiteData.metaTitle || websiteData.name;
-
-        // Set Meta Description
+    if (websiteData && pageData) {
+        document.title = pageData.metaTitle || websiteData.name;
         let metaDescription = document.querySelector('meta[name="description"]');
         if (!metaDescription) {
             metaDescription = document.createElement('meta');
             metaDescription.setAttribute('name', 'description');
             document.head.appendChild(metaDescription);
         }
-        metaDescription.setAttribute('content', websiteData.metaDescription || websiteData.tagline || '');
+        metaDescription.setAttribute('content', pageData.metaDescription || pageData.tagline || '');
 
-        // Set Favicon
         let favicon = document.querySelector('link[rel="icon"]');
         if (!favicon) {
             favicon = document.createElement('link');
@@ -80,7 +77,26 @@ const PublishedWebsite: React.FC = () => {
         }
         favicon.setAttribute('href', websiteData.faviconUrl || '/favicon.ico');
     }
-  }, [websiteData]);
+  }, [websiteData, pageData]);
+
+  // Animation effect for published site
+  useEffect(() => {
+    if (!isLoading && websiteData) {
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('is-visible');
+            observer.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1 });
+
+      const animatedElements = document.querySelectorAll('[data-animation]');
+      animatedElements.forEach(el => observer.observe(el));
+
+      return () => observer.disconnect();
+    }
+  }, [isLoading, websiteData]);
 
 
   if (isLoading) {
@@ -105,13 +121,13 @@ const PublishedWebsite: React.FC = () => {
     );
   }
 
-  if (!websiteData) {
+  if (!websiteData || !pageData) {
     return null;
   }
 
   return (
     <div className="w-screen h-screen">
-      <Preview websiteData={websiteData} />
+      <Preview websiteData={websiteData} activePage={pageData} />
     </div>
   );
 };

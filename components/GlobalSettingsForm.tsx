@@ -1,4 +1,3 @@
-
 import React from 'react';
 import type { WebsiteData, Theme } from '../types';
 import type { Updater } from 'use-immer';
@@ -25,9 +24,12 @@ const GlobalSettingsForm: React.FC<GlobalSettingsFormProps> = ({ websiteData, se
     })
   }
 
+  // FIX: Updated `colorName` to be a specific key of the palette for better type safety, removing the need for a cast.
   const handlePaletteChange = (colorName: keyof WebsiteData['palette'], value: string) => {
       setWebsiteData(draft => {
-          if (draft) draft.palette[colorName] = value;
+          if (draft) {
+              draft.palette[colorName] = value;
+          }
       })
   }
   
@@ -52,24 +54,6 @@ const GlobalSettingsForm: React.FC<GlobalSettingsFormProps> = ({ websiteData, se
               className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm"
             />
           </div>
-          <div>
-            <label className="text-sm font-medium text-slate-600 block mb-1">Tagline</label>
-            <input
-              type="text"
-              value={websiteData.tagline}
-              onChange={(e) => handleInputChange('tagline', e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm"
-            />
-          </div>
-           <div>
-            <label className="text-sm font-medium text-slate-600 block mb-1">Hero Image URL</label>
-            <input
-              type="text"
-              value={websiteData.heroImageUrl}
-              onChange={(e) => handleInputChange('heroImageUrl', e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm"
-            />
-          </div>
            <div>
             <label className="text-sm font-medium text-slate-600 block mb-1">Theme</label>
             <div className="grid grid-cols-2 gap-2">
@@ -91,8 +75,8 @@ const GlobalSettingsForm: React.FC<GlobalSettingsFormProps> = ({ websiteData, se
       <div>
         <h3 className="text-lg font-semibold mb-2 text-slate-700">Global Colors</h3>
         <div className="grid grid-cols-2 gap-4">
-            {/* FIX: Corrected the type assertion for `Object.keys` to ensure `paletteKey` is correctly typed as a key of the palette object, resolving the type error in `handlePaletteChange`. */}
-            {(Object.keys(websiteData.palette) as (keyof typeof websiteData.palette)[]).map(paletteKey => (
+            {/* FIX: Corrected the type assertion for Object.keys to match the expected type in handlePaletteChange, ensuring type safety. */}
+            {(Object.keys(websiteData.palette) as (keyof WebsiteData['palette'])[]).map(paletteKey => (
                 <div key={paletteKey}>
                     <label className="text-sm font-medium text-slate-600 block mb-1 capitalize">{paletteKey}</label>
                     <input type="color" value={websiteData.palette[paletteKey]} onChange={e => handlePaletteChange(paletteKey, e.target.value)} className="w-full h-10 p-1 border border-slate-300 rounded-md"/>
@@ -103,25 +87,6 @@ const GlobalSettingsForm: React.FC<GlobalSettingsFormProps> = ({ websiteData, se
        <div>
         <h3 className="text-lg font-semibold mb-2 text-slate-700">SEO & Metadata</h3>
         <div className="space-y-4">
-          <div>
-            <label className="text-sm font-medium text-slate-600 block mb-1">Meta Title</label>
-            <input
-              type="text"
-              value={websiteData.metaTitle || ''}
-              onChange={(e) => handleInputChange('metaTitle', e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm"
-              placeholder="Your Website Title"
-            />
-          </div>
-          <div>
-            <label className="text-sm font-medium text-slate-600 block mb-1">Meta Description</label>
-            <textarea
-              value={websiteData.metaDescription || ''}
-              onChange={(e) => handleInputChange('metaDescription', e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm h-24"
-              placeholder="A brief description of your website."
-            />
-          </div>
           <div>
             <label className="text-sm font-medium text-slate-600 block mb-1">Favicon URL</label>
             <input
@@ -136,13 +101,7 @@ const GlobalSettingsForm: React.FC<GlobalSettingsFormProps> = ({ websiteData, se
       </div>
       <div>
         <h3 className="text-lg font-semibold mb-2 text-slate-700">Content Sections</h3>
-        <button
-          onClick={onAddSection}
-          className="w-full flex items-center justify-center bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded hover:bg-slate-300"
-        >
-            <PlusIcon className="w-5 h-5 mr-2"/>
-            Add Section
-        </button>
+        <p className="text-sm text-slate-500 mb-2">To add sections, select a page and use the "Layers" panel.</p>
       </div>
     </div>
   );

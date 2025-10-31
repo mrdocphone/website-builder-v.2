@@ -1,9 +1,14 @@
+
+
 import React, { useMemo } from 'react';
-import type { WebsiteData, ThemeConfig, Theme, WebsiteNode, Element as IElement, HeadlineElement, TextElement, ImageElement, ButtonElement, VideoElement, IconElement, Column, Device, ResponsiveStyles, StyleProperties, EmbedElement, FormElement } from '../types';
+import type { WebsiteData, ThemeConfig, Theme, WebsiteNode, Element as IElement, HeadlineElement, TextElement, ImageElement, ButtonElement, VideoElement, IconElement, Column, Device, ResponsiveStyles, StyleProperties, EmbedElement, FormElement, Page } from '../types';
 import { PlusIcon, availableIcons, IconRenderer as Icon } from './icons';
+import AiToolbar from './AiToolbar';
+import RichTextToolbar from './RichTextToolbar';
 
 interface PreviewProps {
   websiteData: WebsiteData;
+  activePage: Page;
   interactive?: boolean;
   device?: Device;
   selectedNodeId?: string | null;
@@ -11,6 +16,8 @@ interface PreviewProps {
   onSelectNode?: (id: string) => void;
   onHoverNode?: (id: string | null) => void;
   onUpdateNode?: (id: string, updates: Partial<WebsiteNode>) => void;
+  onAiTextUpdate?: (nodeId: string, action: string, options?: { tone?: string }) => void;
+  isAiLoading?: boolean;
 }
 
 const themeConfigs: Record<Theme, ThemeConfig> = {
@@ -46,12 +53,13 @@ const ElementRenderer: React.FC<{
         return null;
     }
 
-    const handleContentBlur = (e: React.FocusEvent<HTMLElement>) => {
+    const handleContentInput = (e: React.FormEvent<HTMLElement>) => {
         if (!interactive || !onUpdateNode) return;
-        const newText = e.currentTarget.innerText;
-        if ((element as any).content.text !== newText) {
-            onUpdateNode(element.id, { content: { ...(element as any).content, text: newText } });
-        }
+        const newHtml = e.currentTarget.innerHTML;
+        // The state update is now handled by the input event listener.
+        // This is a "controlled" component in a sense.
+        // The parent component will re-render this with the new HTML.
+        onUpdateNode(element.id, { content: { ...(element as any).content, text: newHtml } });
     };
   
     switch (element.type) {
@@ -59,11 +67,11 @@ const ElementRenderer: React.FC<{
             const { level, text } = element.content as HeadlineElement['content'];
             const Tag = (level && ['h1', 'h2', 'h3'].includes(level)) ? level : 'h2';
             const sizeClasses = { h1: 'text-4xl font-bold', h2: 'text-3xl font-bold', h3: 'text-2xl font-semibold' };
-            return ( <Tag className={sizeClasses[Tag]} contentEditable={interactive} onBlur={handleContentBlur} suppressContentEditableWarning>{text}</Tag> );
+            return ( <Tag className={sizeClasses[Tag]} contentEditable={interactive} onInput={handleContentInput} suppressContentEditableWarning dangerouslySetInnerHTML={{ __html: text }} /> );
         }
         case 'text': {
             const { text } = element.content as TextElement['content'];
-            return ( <p className="whitespace-pre-wrap leading-relaxed" contentEditable={interactive} onBlur={handleContentBlur} suppressContentEditableWarning>{text}</p> );
+            return ( <div className="whitespace-pre-wrap leading-relaxed" contentEditable={interactive} onInput={handleContentInput} suppressContentEditableWarning dangerouslySetInnerHTML={{ __html: text }} /> );
         }
         case 'image': {
             const { src, alt } = element.content as ImageElement['content'];
@@ -73,9 +81,16 @@ const ElementRenderer: React.FC<{
         case 'button': {
             const { text, href } = element.content as ButtonElement['content'];
             if (!text || !href) { return null; }
+            const handleBlur = (e: React.FocusEvent<HTMLElement>) => {
+              if (!interactive || !onUpdateNode) return;
+              const newText = e.currentTarget.innerText;
+              if (text !== newText) {
+                  onUpdateNode(element.id, { content: { ...element.content, text: newText } });
+              }
+            };
             return (
                 <a href={href} className={`inline-block ${theme.primary} ${theme.primaryText} px-6 py-3 rounded-md font-semibold no-underline`}>
-                    <span contentEditable={interactive} onBlur={handleContentBlur} suppressContentEditableWarning>{text}</span>
+                    <span contentEditable={interactive} onBlur={handleBlur} suppressContentEditableWarning>{text}</span>
                 </a>
             );
         }
@@ -134,7 +149,10 @@ const InteractiveWrapper: React.FC<React.PropsWithChildren<{
     isHovered?: boolean;
     onSelect?: (id: string) => void;
     onHover?: (id: string | null) => void;
-}>> = ({ children, node, interactive, isSelected, isHovered, onSelect, onHover }) => {
+    onUpdateNode?: (id: string, updates: Partial<WebsiteNode>) => void;
+    onAiTextUpdate?: (nodeId: string, action: string, options?: { tone?: string }) => void;
+    isAiLoading?: boolean;
+}>> = ({ children, node, interactive, isSelected, isHovered, onSelect, onHover, onUpdateNode, onAiTextUpdate, isAiLoading }) => {
     if (!interactive) {
         return <>{children}</>;
     }
@@ -159,6 +177,9 @@ const InteractiveWrapper: React.FC<React.PropsWithChildren<{
         isSelected ? 'selected' : '',
         isHovered ? 'hovered' : ''
     ].join(' ').trim();
+    
+    const isAiTextElement = ['headline', 'text', 'button'].includes(node.type);
+    const isRichTextElement = ['headline', 'text'].includes(node.type);
 
     return (
         <div
@@ -167,12 +188,20 @@ const InteractiveWrapper: React.FC<React.PropsWithChildren<{
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
         >
+            {isSelected && isAiTextElement && onAiTextUpdate && (
+                <AiToolbar 
+                    node={node} 
+                    onAiAction={onAiTextUpdate} 
+                    isLoading={isAiLoading} 
+                />
+            )}
+            {isSelected && isRichTextElement && <RichTextToolbar />}
             {children}
         </div>
     );
 };
 
-const NodeRenderer: React.FC<Omit<PreviewProps, 'websiteData'> & { node: WebsiteNode, theme: ThemeConfig }> = (props) => {
+const NodeRenderer: React.FC<Omit<PreviewProps, 'websiteData' | 'activePage'> & { node: WebsiteNode, theme: ThemeConfig }> = (props) => {
     const { node, theme, device = 'desktop' } = props;
 
     if (!node || !node.id || !node.type) { return null; }
@@ -193,11 +222,16 @@ const NodeRenderer: React.FC<Omit<PreviewProps, 'websiteData'> & { node: Website
   
     let className = '';
     let Tag: React.ElementType = 'div';
+    const dataAttributes: Record<string, string> = {};
     
     switch(node.type) {
         case 'section':
             Tag = 'section';
-            className = 'w-full'; // Simplified: padding now controlled by style panel
+            className = 'w-full';
+            if (node.animation && node.animation !== 'none') {
+                className += ` gjs-animation-section ${node.animation}`;
+                dataAttributes['data-animation'] = node.animation;
+            }
             break;
         case 'row':
             className = 'w-full';
@@ -215,7 +249,7 @@ const NodeRenderer: React.FC<Omit<PreviewProps, 'websiteData'> & { node: Website
 
     return (
         <InteractiveWrapper {...props} node={node} isSelected={isSelected} isHovered={isHovered}>
-            <Tag className={className} style={mergedStyles}>
+            <Tag className={className} style={mergedStyles} {...dataAttributes}>
                 {node.children
                     .filter(child => child && child.id)
                     .map(child => (
@@ -228,7 +262,7 @@ const NodeRenderer: React.FC<Omit<PreviewProps, 'websiteData'> & { node: Website
 };
 
 const Preview: React.FC<PreviewProps> = (props) => {
-  const { websiteData } = props;
+  const { websiteData, activePage } = props;
   const theme = useMemo(() => themeConfigs[websiteData.theme] || themeConfigs.light, [websiteData.theme]);
 
   return (
@@ -238,17 +272,17 @@ const Preview: React.FC<PreviewProps> = (props) => {
       </header>
 
       <section className="relative h-72">
-        <img src={websiteData.heroImageUrl} alt={`${websiteData.name} hero image`} className="w-full h-full object-cover" />
+        <img src={activePage.heroImageUrl} alt={`${activePage.name} hero image`} className="w-full h-full object-cover" />
         <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center p-6">
           <div className="text-center">
-            <h2 className="text-4xl font-extrabold text-white">{websiteData.name}</h2>
-            <p className="mt-2 text-lg text-slate-200">{websiteData.tagline}</p>
+            <h2 className="text-4xl font-extrabold text-white">{activePage.name}</h2>
+            <p className="mt-2 text-lg text-slate-200">{activePage.tagline}</p>
           </div>
         </div>
       </section>
 
       <main>
-        {websiteData.children && websiteData.children.filter(Boolean).map(section => (
+        {activePage.children && activePage.children.filter(Boolean).map(section => (
             <NodeRenderer key={section.id} {...props} node={section} theme={theme} />
         ))}
       </main>

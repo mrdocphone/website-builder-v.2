@@ -258,7 +258,172 @@
         outline: 1px dashed #4f46e5;
         outline-offset: 2px;
       }
+      
+      /* NEW: AI Toolbar */
+      .ai-toolbar {
+        position: absolute;
+        top: -38px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 20;
+      }
+      .ai-toolbar-button {
+        background-color: #3730a3; /* indigo-800 */
+        color: white;
+        border: none;
+        border-radius: 9999px;
+        padding: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        transition: background-color 0.2s;
+      }
+      .ai-toolbar-button:hover {
+        background-color: #4338ca; /* indigo-700 */
+      }
+      .ai-popover {
+        position: absolute;
+        bottom: calc(100% + 8px);
+        left: 50%;
+        transform: translateX(-50%);
+        background-color: white;
+        border-radius: 8px;
+        box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        width: 180px;
+        overflow: hidden;
+        border: 1px solid #e2e8f0;
+      }
+      .ai-popover-button {
+        display: block;
+        width: 100%;
+        text-align: left;
+        padding: 8px 12px;
+        font-size: 14px;
+        background: none;
+        border: none;
+        cursor: pointer;
+      }
+       .ai-popover-button:hover {
+         background-color: #f1f5f9;
+       }
+      
+      /* NEW: Context Menu */
+      .context-menu {
+        position: fixed;
+        z-index: 1000;
+        width: 200px;
+        background-color: white;
+        border-radius: 8px;
+        box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        border: 1px solid #e2e8f0; /* slate-200 */
+        padding: 0.5rem;
+      }
+      .context-menu-item {
+        display: flex;
+        align-items: center;
+        width: 100%;
+        padding: 0.5rem;
+        font-size: 0.875rem; /* 14px */
+        text-align: left;
+        background: none;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        color: #334155; /* slate-700 */
+      }
+      .context-menu-item:hover {
+        background-color: #f1f5f9; /* slate-100 */
+      }
+       .context-menu-item.danger:hover {
+        background-color: #fee2e2; /* red-100 */
+        color: #b91c1c; /* red-700 */
+       }
+      .context-menu-item:disabled {
+        color: #94a3b8; /* slate-400 */
+        cursor: not-allowed;
+      }
+      .context-menu-separator {
+        height: 1px;
+        background-color: #e2e8f0; /* slate-200 */
+        margin: 0.5rem 0;
+      }
 
+      /* NEW: Rich Text Toolbar */
+      .rich-text-toolbar {
+        position: absolute;
+        top: -42px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 20;
+        display: flex;
+        align-items: center;
+        background-color: #1e293b; /* slate-800 */
+        border-radius: 6px;
+        padding: 4px;
+        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        gap: 2px;
+      }
+      .rich-text-toolbar-button {
+        background: none;
+        border: none;
+        color: #94a3b8; /* slate-400 */
+        padding: 6px;
+        cursor: pointer;
+        border-radius: 4px;
+        line-height: 1;
+      }
+      .rich-text-toolbar-button:hover {
+        background-color: #334155; /* slate-700 */
+        color: #f1f5f9; /* slate-100 */
+      }
+      .rich-text-toolbar-button.active {
+        background-color: #4f46e5; /* indigo-600 */
+        color: white;
+      }
+      .rich-text-link-popover {
+          position: absolute;
+          bottom: calc(100% + 8px);
+          left: 50%;
+          transform: translateX(-50%);
+          display: flex;
+          background-color: #1e293b;
+          padding: 8px;
+          border-radius: 6px;
+          gap: 4px;
+      }
+      .rich-text-link-popover input {
+          background-color: #334155;
+          color: white;
+          border: 1px solid #475569;
+          border-radius: 4px;
+          padding: 4px 8px;
+          font-size: 14px;
+          outline: none;
+      }
+      .rich-text-link-popover button {
+          background-color: #4f46e5;
+          color: white;
+          border: none;
+          border-radius: 4px;
+          padding: 4px 8px;
+          cursor: pointer;
+          font-size: 14px;
+      }
+      
+      /* NEW: Animation Styles */
+      .gjs-animation-section {
+        opacity: 0;
+        transition: opacity 0.7s ease-out, transform 0.7s ease-out;
+      }
+      .gjs-animation-section.slideInUp {
+        transform: translateY(20px);
+      }
+      .gjs-animation-section.is-visible {
+        opacity: 1;
+        transform: translateY(0);
+      }
 
       /* General UI Helpers */
       [contenteditable="false"]::-webkit-resizer { display: none; }

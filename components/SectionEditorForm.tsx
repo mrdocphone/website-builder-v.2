@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import type { WebsiteNode, Device, StyleProperties, Element, IconElement, WebsiteData, FormElement, EmbedElement } from '../types';
 import { availableIcons, IconRenderer, DesktopIcon, TabletIcon, MobileIcon } from './icons';
@@ -133,6 +134,10 @@ const StylePanel: React.FC<StylePanelProps> = ({ node, websiteData, onUpdate }) 
     const handleContentChange = (field: string, value: any) => {
         onUpdate(node.id, { content: { ...(node as any).content, [field]: value } });
     };
+    
+    const handleAnimationChange = (value: WebsiteNode['animation']) => {
+        onUpdate(node.id, { animation: value });
+    }
 
     const getInheritedStyleValue = (prop: keyof StyleProperties) => {
         if (editingDevice === 'desktop') {
@@ -232,6 +237,21 @@ const StylePanel: React.FC<StylePanelProps> = ({ node, websiteData, onUpdate }) 
                  <Accordion title="Content">
                     {renderContentFields()}
                 </Accordion>
+                {node.type === 'section' && (
+                    <Accordion title="Animation">
+                        <StyleInput 
+                            label="Entrance Animation"
+                            value={node.animation || 'none'}
+                            onChange={handleAnimationChange}
+                            type="select"
+                            options={[
+                                { value: 'none', label: 'None' },
+                                { value: 'fadeIn', label: 'Fade In' },
+                                { value: 'slideInUp', label: 'Slide In Up' },
+                            ]}
+                        />
+                    </Accordion>
+                )}
                 <Accordion title="Spacing">
                     <StyleInput label="Margin Top" value={currentStylesForEditing.marginTop} onChange={val => handleStyleChange('marginTop', val)} isInherited={isInherited('marginTop')}/>
                     <StyleInput label="Margin Bottom" value={currentStylesForEditing.marginBottom} onChange={val => handleStyleChange('marginBottom', val)} isInherited={isInherited('marginBottom')}/>

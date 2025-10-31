@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import type { WebsiteData } from '../types';
 import { XIcon, LinkIcon } from './icons';
@@ -10,7 +11,6 @@ interface PublishModalProps {
 }
 
 const PublishModal: React.FC<PublishModalProps> = ({ username, websiteData, onClose, onPublishSuccess }) => {
-  const [slug, setSlug] = useState(websiteData.slug || 'home');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [successUrl, setSuccessUrl] = useState('');
@@ -20,29 +20,18 @@ const PublishModal: React.FC<PublishModalProps> = ({ username, websiteData, onCl
     setError('');
     setSuccessUrl('');
 
-    // Basic slug validation
-    const sanitizedSlug = slug.toLowerCase().replace(/[^a-z0-9-]/g, '');
-    if (!sanitizedSlug) {
-        setError('Please enter a valid URL path (e.g., "about-us" or "home").');
-        setIsLoading(false);
-        return;
-    }
-    setSlug(sanitizedSlug);
-    
-    const dataToPublish = { ...websiteData, slug: sanitizedSlug };
-
     try {
         const response = await fetch('/api/publish', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, websiteData: dataToPublish }),
+            body: JSON.stringify({ username, websiteData }),
         });
         
         const result = await response.json();
 
         if (response.ok && result.success) {
             setSuccessUrl(`${window.location.origin}${result.url}`);
-            onPublishSuccess(dataToPublish);
+            onPublishSuccess(websiteData);
         } else {
             setError(result.message || 'An unexpected error occurred.');
         }
@@ -53,6 +42,8 @@ const PublishModal: React.FC<PublishModalProps> = ({ username, websiteData, onCl
         setIsLoading(false);
     }
   };
+  
+  const homepage = websiteData.pages.find(p => p.isHomepage) || websiteData.pages[0];
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -68,7 +59,7 @@ const PublishModal: React.FC<PublishModalProps> = ({ username, websiteData, onCl
             {successUrl ? (
                 <div className="text-center">
                     <h3 className="text-lg font-semibold text-green-700">Published Successfully!</h3>
-                    <p className="mt-2 text-slate-600">Your website is now live at:</p>
+                    <p className="mt-2 text-slate-600">Your homepage is now live at:</p>
                     <div className="mt-4 flex items-center border rounded-md p-2 bg-slate-50">
                         <LinkIcon className="w-5 h-5 text-slate-400 mr-2"/>
                         <a href={successUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-600 font-medium break-all">{successUrl}</a>
@@ -82,29 +73,18 @@ const PublishModal: React.FC<PublishModalProps> = ({ username, websiteData, onCl
                 </div>
             ) : (
                 <>
-                    <p className="text-slate-600 mb-4">Set a URL path for this page. Use "home" for your main page.</p>
-                    <div>
-                        <label htmlFor="slug" className="text-sm font-medium text-slate-700 block mb-2">URL Path</label>
-                        <div className="flex items-center">
-                            <span className="text-slate-500 bg-slate-100 p-2 rounded-l-md border border-r-0">/{username}/</span>
-                            <input
-                                id="slug"
-                                type="text"
-                                value={slug}
-                                onChange={(e) => setSlug(e.target.value)}
-                                className="w-full px-3 py-2 border border-slate-300 rounded-r-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                                placeholder="home"
-                            />
-                        </div>
+                    <p className="text-slate-600 mb-4">You are about to publish your entire website. Your homepage is set to:</p>
+                    <div className="p-2 bg-slate-100 rounded-md text-center font-medium text-slate-700">
+                        {homepage?.name || "N/A"} (<span className="font-mono text-sm">/{homepage?.slug}</span>)
                     </div>
-                    {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+                    {error && <p className="mt-4 text-sm text-red-600 text-center">{error}</p>}
                     <div className="mt-6">
                         <button
                             onClick={handlePublish}
                             disabled={isLoading}
                             className="w-full bg-indigo-600 text-white font-bold py-2.5 px-4 rounded hover:bg-indigo-700 disabled:bg-indigo-400"
                         >
-                            {isLoading ? 'Publishing...' : 'Publish'}
+                            {isLoading ? 'Publishing...' : 'Publish Site'}
                         </button>
                     </div>
                 </>

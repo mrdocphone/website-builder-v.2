@@ -1,6 +1,6 @@
 
 import { v4 as uuidv4 } from 'uuid';
-import type { WebsiteNode, Section, Row, Column, Element, ResponsiveStyles } from '../types';
+import type { WebsiteNode, Section, Row, Column, Element, ResponsiveStyles, Page } from '../types';
 
 // Recursive function to find a node by its ID
 export function findNodeById(nodes: WebsiteNode[], id: string): WebsiteNode | null {
@@ -97,8 +97,8 @@ const createDefaultElement = (type: Element['type']): Element => {
 
 // Immer-compatible function to add a new node
 // FIX: Widen type to include 'section' to match implementation and fix comparison error.
-export const addNode = (draft: { children: Section[], id: string }, parentId: string, type: 'section' | 'row' | 'column' | Element['type']) => {
-    // Handle adding a section to the root
+export const addNode = (draft: Page, parentId: string, type: 'section' | 'row' | 'column' | Element['type']) => {
+    // Handle adding a section to the root (the page)
     if (parentId === draft.id && type === 'section') {
         const newSection: Section = { id: uuidv4(), type: 'section', styles: createDefaultStyles(), children: [] };
         draft.children.push(newSection);
@@ -132,6 +132,36 @@ export const addNode = (draft: { children: Section[], id: string }, parentId: st
     }
 };
 
+// FIX: Implement duplicateNodeById to handle node duplication logic.
+// Deep copy a node and assign new IDs to it and all its children.
+function deepCloneWithNewIds(node: WebsiteNode): WebsiteNode {
+    const newNode = { ...node, id: uuidv4() };
+
+    if ('children' in newNode && Array.isArray(newNode.children)) {
+        (newNode as any).children = newNode.children.map(child => deepCloneWithNewIds(child as WebsiteNode));
+    }
+
+    return newNode;
+}
+
+// Finds a node, duplicates it, and inserts the copy next to the original.
+export function duplicateNodeById(nodes: WebsiteNode[], id: string): boolean {
+    for (let i = 0; i < nodes.length; i++) {
+        const node = nodes[i];
+        if (node.id === id) {
+            const duplicatedNode = deepCloneWithNewIds(node);
+            nodes.splice(i + 1, 0, duplicatedNode);
+            return true;
+        }
+        if ('children' in node && Array.isArray(node.children)) {
+            if (duplicateNodeById(node.children as WebsiteNode[], id)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 // --- Drag and Drop Logic ---
 
 interface NodeLocation {
@@ -157,6 +187,7 @@ const findNodeAndParent = (root: WebsiteNode[], id: string): NodeLocation | null
 // Defines what node types can be dropped into which parent types.
 const validChildrenMap: Record<string, string[]> = {
     root: ['section'],
+    page: ['section'], // Page is the new root
     section: ['row'],
     row: ['column'],
     column: ['headline', 'text', 'image', 'button', 'spacer', 'icon', 'video', 'form', 'embed'],
@@ -173,8 +204,7 @@ export const moveNode = (root: WebsiteNode[], sourceId: string, targetId: string
     const { parent: sourceParent, node: sourceNode, index: sourceIndex } = sourceLocation;
     const { parent: targetParent, node: targetNode, index: targetIndex } = targetLocation;
 
-    // Validation: Check if the source node type is allowed in the target's parent
-    const targetParentType = 'type' in targetParent ? targetParent.type : 'root';
+    const targetParentType = 'type' in targetParent ? targetParent.type : 'page';
     if (!validChildrenMap[targetParentType]?.includes(sourceNode.type)) {
         console.warn(`Cannot move ${sourceNode.type} into ${targetParentType}`);
         return; 

@@ -1,7 +1,9 @@
 
+
 // Vercel Serverless Function
 // This function retrieves website data from Vercel KV by its slug.
 import { kv } from '@vercel/kv';
+import type { Page, WebsiteData } from '../types';
 
 export const config = {
   runtime: 'edge',
@@ -27,30 +29,14 @@ export default async function handler(request: Request) {
         });
     }
 
-    // Sanitize on the server-side to guarantee key format consistency, matching the publish API.
     const safeUsername = usernameParam.toLowerCase().replace(/[^a-z0-9-]/g, '');
     const safeSlug = slugParam ? slugParam.toLowerCase().replace(/[^a-z0-9-]/g, '') : null;
 
-    // If a slug is provided, fetch a specific sub-page (e.g., site:user/about).
-    // If no slug is provided, fetch the user's main page (e.g., site:user).
     const key = safeSlug ? `site:${safeUsername}/${safeSlug}` : `site:${safeUsername}`;
-    const rawData = await kv.get(key);
+    const rawData = await kv.get<{ site: WebsiteData, page: Page }>(key);
     
-    let websiteData: any = null;
-
-    if (typeof rawData === 'string') {
-        try {
-            websiteData = JSON.parse(rawData);
-        } catch (e) {
-            console.error(`Failed to parse JSON for key ${key}:`, rawData);
-            websiteData = null; 
-        }
-    } else if (typeof rawData === 'object' && rawData !== null) {
-        websiteData = rawData;
-    }
-
-    if (websiteData && typeof websiteData === 'object' && websiteData.name && Array.isArray(websiteData.children)) {
-        return new Response(JSON.stringify(websiteData), { 
+    if (rawData && rawData.site && rawData.page) {
+        return new Response(JSON.stringify(rawData), { 
             status: 200, 
             headers: { 'Content-Type': 'application/json' } 
         });

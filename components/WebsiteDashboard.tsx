@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { Session, WebsiteData } from '../types';
+import type { Session, WebsiteData, Page } from '../types';
 import { LogoutIcon, PencilIcon, LinkIcon, PlusIcon, TrashIcon } from './icons';
 
 const WebsiteDashboard: React.FC<{ onLogout: () => void, session: Session }> = ({ onLogout, session }) => {
@@ -72,6 +73,11 @@ const WebsiteDashboard: React.FC<{ onLogout: () => void, session: Session }> = (
             }
         }
     }
+    
+    const getHomepageSlug = (site: WebsiteData): string => {
+        const homepage = site.pages.find(p => p.isHomepage);
+        return homepage ? homepage.slug : (site.pages[0]?.slug || '');
+    }
 
     return (
       <div className="min-h-screen bg-slate-100 font-sans">
@@ -114,12 +120,12 @@ const WebsiteDashboard: React.FC<{ onLogout: () => void, session: Session }> = (
                                 <div className="mb-4 sm:mb-0">
                                     <h2 className="text-lg font-semibold text-slate-800">{site.name}</h2>
                                     <a 
-                                        href={`/${session.username}/${site.slug}`}
+                                        href={`/${session.username}/${getHomepageSlug(site)}`}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="text-sm text-indigo-600 hover:underline flex items-center mt-1"
                                     >
-                                        /{session.username}/{site.slug}
+                                        Live Site
                                         <LinkIcon className="w-4 h-4 ml-1.5" />
                                     </a>
                                 </div>

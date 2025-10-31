@@ -1,4 +1,5 @@
 
+
 export type Theme = 'light' | 'dark' | 'ocean' | 'forest';
 export type Device = 'desktop' | 'tablet' | 'mobile';
 
@@ -23,6 +24,9 @@ export interface StyleProperties {
   backgroundImage?: string; // For gradients and images
   // Border
   borderRadius?: string;
+  borderWidth?: string;
+  borderStyle?: 'none' | 'solid' | 'dashed' | 'dotted' | 'double';
+  borderColor?: string;
   // Dimensions
   height?: string; // For Spacer
   width?: string;
@@ -44,6 +48,7 @@ interface StructureNode<T extends string> {
   id: string;
   type: T;
   styles: ResponsiveStyles;
+  animation?: 'none' | 'fadeIn' | 'slideInUp';
 }
 
 // CONTENT ELEMENT TYPES
@@ -94,16 +99,24 @@ export interface Section extends StructureNode<'section'> {
 // Combined type for any node in the structure tree
 export type WebsiteNode = Section | Row | Column | Element;
 
-// TOP-LEVEL WEBSITE DATA
+// NEW: Page Structure
+export interface Page {
+  id: string;
+  name: string;
+  slug: string;
+  isHomepage: boolean;
+  heroImageUrl: string;
+  tagline: string;
+  metaTitle?: string;
+  metaDescription?: string;
+  children: Section[];
+}
+
+// UPDATED: TOP-LEVEL WEBSITE DATA
 export interface WebsiteData {
   id: string;
   name: string;
-  tagline: string;
-  slug: string;
   theme: Theme;
-  heroImageUrl: string; // Kept for simplicity of the top hero
-  metaTitle?: string;
-  metaDescription?: string;
   faviconUrl?: string;
   palette: {
       primary: string;
@@ -111,8 +124,9 @@ export interface WebsiteData {
       text: string;
       accent: string;
   };
-  children: Section[]; // The main page content
+  pages: Page[];
 }
+
 
 export interface ThemeConfig {
   bg: string;
