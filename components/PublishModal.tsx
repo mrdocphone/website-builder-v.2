@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import type { WebsiteData } from '../types';
 import { XIcon, LinkIcon } from './icons';
@@ -7,9 +6,10 @@ interface PublishModalProps {
   username: string;
   websiteData: WebsiteData;
   onClose: () => void;
+  onPublishSuccess: (updatedData: WebsiteData) => void;
 }
 
-const PublishModal: React.FC<PublishModalProps> = ({ username, websiteData, onClose }) => {
+const PublishModal: React.FC<PublishModalProps> = ({ username, websiteData, onClose, onPublishSuccess }) => {
   const [slug, setSlug] = useState(websiteData.slug || 'home');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -42,6 +42,7 @@ const PublishModal: React.FC<PublishModalProps> = ({ username, websiteData, onCl
 
         if (response.ok && result.success) {
             setSuccessUrl(`${window.location.origin}${result.url}`);
+            onPublishSuccess(dataToPublish);
         } else {
             setError(result.message || 'An unexpected error occurred.');
         }

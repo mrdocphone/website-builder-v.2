@@ -1,4 +1,3 @@
-
 // Vercel Serverless Function
 import { kv } from '@vercel/kv';
 import type { WebsiteData } from '../types';
@@ -21,31 +20,51 @@ export default async function handler(request: Request) {
         
         // Sanitize on the server-side to guarantee key format consistency.
         const safeUsername = username.toLowerCase().replace(/[^a-z0-9-]/g, '');
-        const safeSlug = websiteData.slug.toLowerCase().replace(/[^a-z0-9-]/g, '');
+        const newSafeSlug = websiteData.slug.toLowerCase().replace(/[^a-z0-9-]/g, '');
 
-        if (!safeSlug) {
+        if (!newSafeSlug) {
             return new Response(JSON.stringify({ message: 'The URL path (slug) cannot be empty.' }), { status: 400 });
         }
-
-        const key = `site:${safeUsername}/${safeSlug}`;
-        const mainKey = `site:${safeUsername}`;
         
-        // Ensure the data being saved contains the sanitized slug and the websiteId
-        const dataToSave = { ...websiteData, slug: safeSlug };
-
-        // Save the specific page
-        await kv.set(key, JSON.stringify(dataToSave));
-
-        // Check if a main page already exists for this user.
-        const mainPageExists = await kv.exists(mainKey);
-
-        // If the current page's slug is 'home', it always becomes the main page.
-        // If no main page exists yet, this publication becomes the main page by default.
-        if (safeSlug === 'home' || !mainPageExists) {
-            await kv.set(mainKey, JSON.stringify(dataToSave));
+        const newKey = `site:${safeUsername}/${newSafeSlug}`;
+        
+        // 1. Uniqueness check: See if another website is already published at the new slug.
+        const existingDataAtNewKey = await kv.get<WebsiteData>(newKey);
+        if (existingDataAtNewKey && existingDataAtNewKey.id !== websiteData.id) {
+             return new Response(JSON.stringify({ message: `The URL path "/${newSafeSlug}" is already in use by another page. Please choose a unique one.` }), { status: 409 });
         }
 
-        return new Response(JSON.stringify({ success: true, url: `/${safeUsername}/${safeSlug}` }), {
+        const editorDataKey = `editor:${websiteData.id}`;
+        const currentEditorData = await kv.get<WebsiteData>(editorDataKey);
+        const pipeline = kv.pipeline();
+
+        // 2. Handle slug change: If slug has changed, delete the old published page.
+        if (currentEditorData && currentEditorData.slug && currentEditorData.slug !== newSafeSlug) {
+            const oldSafeSlug = currentEditorData.slug.toLowerCase().replace(/[^a-z0-9-]/g, '');
+            pipeline.del(`site:${safeUsername}/${oldSafeSlug}`);
+        }
+        
+        const dataToSave = { ...websiteData, slug: newSafeSlug };
+
+        // 3. Save the new/updated published page and also update the editor's data to persist the new slug.
+        pipeline.set(newKey, JSON.stringify(dataToSave));
+        pipeline.set(editorDataKey, JSON.stringify(dataToSave));
+
+        // 4. Handle main page logic.
+        const mainKey = `site:${safeUsername}`;
+        const currentMainPage = await kv.get<WebsiteData>(mainKey);
+        
+        // This page becomes the main page if:
+        // - Its slug is 'home'
+        // - There is no main page currently
+        // - The page being modified *was* the main page (to ensure the user doesn't lose their main page after a rename)
+        if (newSafeSlug === 'home' || !currentMainPage || currentMainPage.id === websiteData.id) {
+            pipeline.set(mainKey, JSON.stringify(dataToSave));
+        }
+
+        await pipeline.exec();
+
+        return new Response(JSON.stringify({ success: true, url: `/${safeUsername}/${newSafeSlug}` }), {
             status: 200,
             headers: { 'Content-Type': 'application/json' },
         });

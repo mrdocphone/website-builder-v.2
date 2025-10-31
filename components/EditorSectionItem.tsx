@@ -1,17 +1,19 @@
 
+
 import React from 'react';
-import type { Styles } from '../types';
+// FIX: Replaced non-existent `Styles` type with `StyleProperties`.
+import type { StyleProperties } from '../types';
 
 interface StylePanelProps {
-    styles: Styles;
-    onStyleChange: (property: keyof Styles, value: string) => void;
+    styles: StyleProperties;
+    onStyleChange: (property: keyof StyleProperties, value: string) => void;
 }
 
 const StyleInput: React.FC<{
     label: string;
-    property: keyof Styles;
+    property: keyof StyleProperties;
     value: string | undefined;
-    onChange: (property: keyof Styles, value: string) => void;
+    onChange: (property: keyof StyleProperties, value: string) => void;
     type?: string;
     options?: { value: string, label: string }[];
 }> = ({ label, property, value, onChange, type = 'text', options }) => (

@@ -1,172 +1,219 @@
+import React, { useState } from 'react';
+import type { WebsiteNode, Device, StyleProperties, Element, IconElement, WebsiteData, FormElement, EmbedElement } from '../types';
+import { availableIcons, IconRenderer } from './icons';
 
-import React from 'react';
-import type { WebsiteNode, Element as ElementType, HeadlineElement, TextElement, ImageElement, ButtonElement, WebsiteData, Section, Row, Column } from '../types';
-import { useImmer } from 'use-immer';
-import { generateSectionContent } from '../services/geminiService';
-import { v4 as uuidv4 } from 'uuid';
-import { MagicWandIcon, TrashIcon, ArrowLeftIcon, PlusIcon } from './icons';
-
-interface SectionEditorFormProps {
+interface StylePanelProps {
   node: WebsiteNode;
+  device: Device;
   websiteData: WebsiteData;
   onUpdate: (id: string, updates: Partial<WebsiteNode>) => void;
-  onDelete: (id: string) => void;
-  onAddElement: (parentId: string, type: 'row' | 'column' | ElementType['type']) => void;
-  onDeselect: () => void;
 }
 
-const StyleInput: React.FC<{ label: string; value: any; onChange: (value: any) => void, type?: string, options?: {value: string, label: string}[] }> = ({ label, value, onChange, type = 'text', options }) => (
-  <div className="mb-2">
-    <label className="text-xs text-slate-500 block">{label}</label>
-    {type === 'select' ? (
-      <select value={value} onChange={e => onChange(e.target.value)} className="w-full p-1 border rounded text-sm">
-        {options?.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-      </select>
-    ) : (
-      <input type={type} value={value} onChange={e => onChange(e.target.value)} className="w-full p-1 border rounded text-sm" />
-    )}
-  </div>
+const StyleInput: React.FC<{
+    label: string;
+    value: any;
+    onChange: (value: any) => void;
+    type?: string;
+    options?: { value: string, label: string }[];
+}> = ({ label, value, onChange, type = 'text', options }) => (
+    <div className="flex items-center justify-between mb-2">
+        <label className="text-sm text-slate-500 block">{label}</label>
+        {type === 'select' ? (
+            <select value={value || ''} onChange={e => onChange(e.target.value)} className="w-1/2 p-1 border rounded text-sm bg-white">
+                {options?.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+            </select>
+        ) : (
+            <input type={type} value={value || ''} onChange={e => onChange(e.target.value)} className={`w-1/2 p-1 border rounded text-sm ${type === 'color' ? 'h-8' : ''}`} />
+        )}
+    </div>
 );
 
-const SectionEditorForm: React.FC<SectionEditorFormProps> = ({ node, websiteData, onUpdate, onDelete, onAddElement, onDeselect }) => {
-    const [isLoading, setIsLoading] = React.useState(false);
+const ColorPicker: React.FC<{
+    label: string;
+    value: string | undefined;
+    onChange: (value: string) => void;
+    palette: WebsiteData['palette'];
+}> = ({ label, value, onChange, palette }) => (
+    <div>
+        <div className="flex items-center justify-between mb-2">
+            <label className="text-sm text-slate-500 block">{label}</label>
+            <input type="color" value={value || '#000000'} onChange={e => onChange(e.target.value)} className="w-1/2 p-1 h-8 border rounded text-sm" />
+        </div>
+        <div className="global-color-swatches">
+            {Object.values(palette).map((color, i) => (
+                <button key={i} onClick={() => onChange(color)} className="global-color-swatch" style={{ backgroundColor: color }} />
+            ))}
+        </div>
+    </div>
+);
 
-    const handleGenerateContent = async (section: Section) => {
-        setIsLoading(true);
-        try {
-            const elementsByColumn = await generateSectionContent(websiteData, section);
-            // Update the section with the new elements
-            onUpdate(section.id, {
-                children: section.children.map((row, rowIndex) => ({
-                    ...row,
-                    children: row.children.map((col, colIndex) => ({
-                        ...col,
-                        children: (elementsByColumn[colIndex] || []).map((el: any) => ({
-                            id: uuidv4(),
-                            styles: {},
-                            ...el,
-                        }))
-                    }))
-                }))
-            });
-        } catch (error) {
-            alert('Failed to generate content.');
-        } finally {
-            setIsLoading(false);
-        }
-    };
-    
-    const renderFormFields = () => {
-        const content = (node as any).content || {};
-        
-        const handleContentChange = (field: string, value: any) => {
-            onUpdate(node.id, { content: { ...content, [field]: value } });
-        };
-        
-        switch (node.type) {
-            case 'headline':
-                return (
-                    <>
-                        <StyleInput label="Text" value={content.text || ''} onChange={val => handleContentChange('text', val)} />
-                        <StyleInput label="Level" value={content.level || 'h2'} onChange={val => handleContentChange('level', val)} type="select" options={[{value: 'h1', label: 'Heading 1'}, {value: 'h2', label: 'Heading 2'}, {value: 'h3', label: 'Heading 3'}]} />
-                    </>
-                );
-            case 'text':
-                return <textarea value={content.text || ''} onChange={e => handleContentChange('text', e.target.value)} className="w-full p-1 border rounded text-sm h-32" />;
-            case 'image':
-                 return (
-                    <>
-                        <StyleInput label="Image URL" value={content.src || ''} onChange={val => handleContentChange('src', val)} />
-                        <StyleInput label="Alt Text" value={content.alt || ''} onChange={val => handleContentChange('alt', val)} />
-                    </>
-                );
-            case 'button':
-                return (
-                    <>
-                        <StyleInput label="Button Text" value={content.text || ''} onChange={val => handleContentChange('text', val)} />
-                        <StyleInput label="Link URL" value={content.href || ''} onChange={val => handleContentChange('href', val)} />
-                    </>
-                );
-            case 'section':
-                return (
-                    <div>
-                        <button
-                            onClick={() => onAddElement(node.id, 'row')}
-                            className="w-full text-sm text-indigo-600 p-2 rounded-md hover:bg-indigo-50 text-left"
-                        >
-                            <PlusIcon className="w-4 h-4 inline mr-2"/>Add Row
-                        </button>
-                         <button
-                            onClick={() => handleGenerateContent(node as Section)}
-                            disabled={isLoading}
-                            className="w-full flex items-center justify-center mt-2 bg-purple-600 text-white font-bold py-2 px-4 rounded hover:bg-purple-700 disabled:bg-purple-400"
-                        >
-                            <MagicWandIcon className="w-5 h-5 mr-2" />
-                            {isLoading ? 'Generating...' : 'Generate with AI'}
-                        </button>
-                    </div>
-                );
-            case 'row':
-                return (
-                     <button
-                        onClick={() => onAddElement(node.id, 'column')}
-                        className="w-full text-sm text-indigo-600 p-2 rounded-md hover:bg-indigo-50 text-left"
-                    >
-                        <PlusIcon className="w-4 h-4 inline mr-2"/>Add Column
-                    </button>
-                )
-             case 'column':
-                const addElementButtons: { type: ElementType['type'], label: string }[] = [
-                    { type: 'headline', label: 'Headline' },
-                    { type: 'text', label: 'Text' },
-                    { type: 'image', label: 'Image' },
-                    { type: 'button', label: 'Button' }
-                ];
-                return (
-                    <div className="grid grid-cols-2 gap-2">
-                        {addElementButtons.map(btn => (
-                            <button key={btn.type} onClick={() => onAddElement(node.id, btn.type)} className="text-sm text-indigo-600 p-2 rounded-md hover:bg-indigo-50 border border-indigo-100">
-                                {btn.label}
-                            </button>
-                        ))}
-                    </div>
-                );
 
-            default:
-                return <p className="text-sm text-slate-500">No editable content for this element.</p>;
+const Accordion: React.FC<React.PropsWithChildren<{title: string}>> = ({ title, children }) => {
+    const [isOpen, setIsOpen] = React.useState(true);
+    return (
+        <div>
+            <button onClick={() => setIsOpen(!isOpen)} className="style-accordion-header">
+                {title}
+            </button>
+            {isOpen && <div className="style-accordion-content">{children}</div>}
+        </div>
+    )
+}
+
+const BackgroundPanel: React.FC<{
+    styles: StyleProperties,
+    palette: WebsiteData['palette'],
+    onStyleChange: (prop: keyof StyleProperties, value: any) => void
+}> = ({ styles, palette, onStyleChange }) => {
+    const [activeTab, setActiveTab] = useState<'color' | 'gradient' | 'image'>('color');
+
+    const handleGradientChange = (part: 'color1' | 'color2' | 'angle', value: string) => {
+        const currentGradient = styles.backgroundImage || 'linear-gradient(90deg, #FFFFFF, #000000)';
+        const parts = currentGradient.replace('linear-gradient(', '').replace(')', '').split(', ');
+        let [angle, color1, color2] = [parts[0], parts[1], parts[2]];
+
+        if (part === 'angle') angle = `${value}deg`;
+        if (part === 'color1') color1 = value;
+        if (part === 'color2') color2 = value;
+
+        onStyleChange('backgroundImage', `linear-gradient(${angle}, ${color1}, ${color2})`);
+    };
+
+    const getGradientParts = () => {
+        if (!styles.backgroundImage?.startsWith('linear-gradient')) {
+            return { angle: '90', color1: '#ffffff', color2: '#000000' };
         }
-    };
-    
-    const handleStyleChange = (prop: string, value: any) => {
-        onUpdate(node.id, { styles: { ...node.styles, [prop]: value } });
-    };
+        const parts = styles.backgroundImage.replace('linear-gradient(', '').replace(')', '').split(', ');
+        return { angle: parts[0].replace('deg', ''), color1: parts[1], color2: parts[2] };
+    }
 
     return (
-        <div className="p-4">
-            <div className="flex items-center justify-between mb-4">
-                <button onClick={onDeselect} className="text-slate-500 hover:text-slate-800"><ArrowLeftIcon className="w-5 h-5" /></button>
-                <h3 className="font-bold text-lg capitalize">{node.type}</h3>
-                <button onClick={() => onDelete(node.id)} className="text-red-500 hover:text-red-700"><TrashIcon className="w-5 h-5" /></button>
+        <div>
+            <div className="style-tab-bar">
+                <button onClick={() => setActiveTab('color')} className={`style-tab ${activeTab === 'color' ? 'active' : ''}`}>Color</button>
+                <button onClick={() => setActiveTab('gradient')} className={`style-tab ${activeTab === 'gradient' ? 'active' : ''}`}>Gradient</button>
+                <button onClick={() => setActiveTab('image')} className={`style-tab ${activeTab === 'image' ? 'active' : ''}`}>Image</button>
             </div>
-            
-            <div className="mb-4 p-4 bg-slate-50 rounded-lg">
-                <h4 className="font-semibold mb-2 text-sm text-slate-600">Content</h4>
-                {renderFormFields()}
-            </div>
-            
-             <div className="p-4 bg-slate-50 rounded-lg">
-                <h4 className="font-semibold mb-2 text-sm text-slate-600">Styling</h4>
-                <StyleInput label="Background Color" type="color" value={node.styles.backgroundColor || ''} onChange={val => handleStyleChange('backgroundColor', val)} />
-                <StyleInput label="Text Color" type="color" value={node.styles.color || ''} onChange={val => handleStyleChange('color', val)} />
-                <StyleInput label="Padding Top" value={node.styles.paddingTop || ''} onChange={val => handleStyleChange('paddingTop', val)} />
-                <StyleInput label="Padding Bottom" value={node.styles.paddingBottom || ''} onChange={val => handleStyleChange('paddingBottom', val)} />
-                {node.type === 'headline' &&
-                  <StyleInput label="Text Align" value={node.styles.textAlign || 'left'} onChange={val => handleStyleChange('textAlign', val)} type="select" options={[{value: 'left', label: 'Left'}, {value: 'center', label: 'Center'}, {value: 'right', label: 'Right'}]} />
-                }
-             </div>
+            {activeTab === 'color' && <ColorPicker label="Color" value={styles.backgroundColor} onChange={val => onStyleChange('backgroundColor', val)} palette={palette} />}
+            {activeTab === 'gradient' && <div>
+                <ColorPicker label="Color 1" value={getGradientParts().color1} onChange={val => handleGradientChange('color1', val)} palette={palette} />
+                <ColorPicker label="Color 2" value={getGradientParts().color2} onChange={val => handleGradientChange('color2', val)} palette={palette} />
+                <StyleInput label="Angle" type="number" value={getGradientParts().angle} onChange={val => handleGradientChange('angle', val)} />
+            </div>}
+            {activeTab === 'image' && <div>
+                <StyleInput label="Image URL" value={(styles.backgroundImage || '').startsWith('url') ? (styles.backgroundImage || '').replace(/url\(['"]?(.*?)['"]?\)/, '$1') : ''} onChange={val => onStyleChange('backgroundImage', `url(${val})`)} />
+                 <p className="text-xs text-slate-500 mt-1">Note: Setting an image or gradient will override the background color.</p>
+            </div>}
+        </div>
+    )
+}
 
+const StylePanel: React.FC<StylePanelProps> = ({ node, device, websiteData, onUpdate }) => {
+    
+    const handleStyleChange = (prop: keyof StyleProperties, value: any) => {
+        const newStyles = {
+            ...node.styles,
+            [device]: {
+                ...node.styles[device],
+                [prop]: value,
+            }
+        };
+        onUpdate(node.id, { styles: newStyles });
+    };
+
+    const handleContentChange = (field: string, value: any) => {
+        onUpdate(node.id, { content: { ...(node as any).content, [field]: value } });
+    };
+
+    const currentStyles = node.styles[device] || {};
+    const content = (node as any).content || {};
+
+    const renderContentFields = () => {
+        switch (node.type) {
+            case 'headline': return (<>
+                <StyleInput label="Text" value={content.text || ''} onChange={val => handleContentChange('text', val)} />
+                <StyleInput label="Level" value={content.level || 'h2'} onChange={val => handleContentChange('level', val)} type="select" options={[{value: 'h1', label: 'Heading 1'}, {value: 'h2', label: 'Heading 2'}, {value: 'h3', label: 'Heading 3'}]} />
+            </>);
+            case 'text': return <textarea value={content.text || ''} onChange={e => handleContentChange('text', e.target.value)} className="w-full p-2 border rounded text-sm h-32" />;
+            case 'image': return (<>
+                <StyleInput label="Image URL" value={content.src || ''} onChange={val => handleContentChange('src', val)} />
+                <StyleInput label="Alt Text" value={content.alt || ''} onChange={val => handleContentChange('alt', val)} />
+            </>);
+            case 'button': return (<>
+                <StyleInput label="Button Text" value={content.text || ''} onChange={val => handleContentChange('text', val)} />
+                <StyleInput label="Link URL" value={content.href || ''} onChange={val => handleContentChange('href', val)} />
+            </>);
+            case 'video': return (<>
+                <StyleInput label="Video URL" value={content.src || ''} onChange={val => handleContentChange('src', val)} />
+                <p className="text-xs text-slate-500 mt-1">Enter a YouTube or Vimeo URL.</p>
+            </>);
+            case 'icon': return (<>
+                <label className="text-sm text-slate-500 block mb-2">Icon</label>
+                <div className="grid grid-cols-4 gap-2">
+                    {Object.keys(availableIcons).map(iconName => (
+                        <button key={iconName} onClick={() => handleContentChange('name', iconName)} className={`p-2 rounded border-2 flex justify-center items-center ${content.name === iconName ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:border-indigo-300'}`}>
+                            <IconRenderer iconName={iconName} className="w-6 h-6" />
+                        </button>
+                    ))}
+                </div>
+            </>);
+            case 'form': return <StyleInput label="Button Text" value={(content as FormElement['content']).buttonText || ''} onChange={val => handleContentChange('buttonText', val)} />;
+            case 'embed': return (<>
+                <label className="text-sm text-slate-500 block mb-2">HTML Code</label>
+                <textarea value={(content as EmbedElement['content']).html || ''} onChange={e => handleContentChange('html', e.target.value)} className="w-full p-2 border rounded text-sm h-40 font-mono" placeholder='<p>Paste your HTML here</p>'/>
+            </>);
+            default: return <p className="text-sm text-center text-slate-400 p-4">No content to edit for this element.</p>;
+        }
+    };
+
+    const isContainer = ['section', 'row', 'column'].includes(node.type);
+
+    return (
+        <div>
+            <div className="p-4 border-b">
+                <h3 className="font-bold text-lg capitalize">{node.type}</h3>
+                <p className="text-sm text-slate-500">Editing for <span className="font-semibold capitalize">{device}</span> view</p>
+            </div>
+            
+             <div className="space-y-px">
+                {isContainer &&
+                    <Accordion title="Layout">
+                        <StyleInput label="Direction" value={currentStyles.flexDirection} onChange={val => handleStyleChange('flexDirection', val)} type="select" options={[{value: 'row', label: 'Row'}, {value: 'column', label: 'Column'}]} />
+                        <StyleInput label="Justify" value={currentStyles.justifyContent} onChange={val => handleStyleChange('justifyContent', val)} type="select" options={[{value: 'flex-start', label: 'Start'}, {value: 'center', label: 'Center'}, {value: 'flex-end', label: 'End'}, {value: 'space-between', label: 'Space Between'}]} />
+                        <StyleInput label="Align" value={currentStyles.alignItems} onChange={val => handleStyleChange('alignItems', val)} type="select" options={[{value: 'flex-start', label: 'Start'}, {value: 'center', label: 'Center'}, {value: 'flex-end', label: 'End'}, {value: 'stretch', label: 'Stretch'}]} />
+                        <StyleInput label="Gap" value={currentStyles.gap} onChange={val => handleStyleChange('gap', val)} />
+                    </Accordion>
+                }
+                 <Accordion title="Content">
+                    {renderContentFields()}
+                </Accordion>
+                <Accordion title="Spacing">
+                    <StyleInput label="Margin Top" value={currentStyles.marginTop} onChange={val => handleStyleChange('marginTop', val)} />
+                    <StyleInput label="Margin Bottom" value={currentStyles.marginBottom} onChange={val => handleStyleChange('marginBottom', val)} />
+                    <StyleInput label="Padding Top" value={currentStyles.paddingTop} onChange={val => handleStyleChange('paddingTop', val)} />
+                    <StyleInput label="Padding Bottom" value={currentStyles.paddingBottom} onChange={val => handleStyleChange('paddingBottom', val)} />
+                    <StyleInput label="Padding Left" value={currentStyles.paddingLeft} onChange={val => handleStyleChange('paddingLeft', val)} />
+                    <StyleInput label="Padding Right" value={currentStyles.paddingRight} onChange={val => handleStyleChange('paddingRight', val)} />
+                </Accordion>
+                <Accordion title="Typography">
+                    <ColorPicker label="Text Color" value={currentStyles.color} onChange={val => handleStyleChange('color', val)} palette={websiteData.palette} />
+                    <StyleInput label="Font Size" value={currentStyles.fontSize} onChange={val => handleStyleChange('fontSize', val)} />
+                    <StyleInput label="Text Align" value={currentStyles.textAlign} onChange={val => handleStyleChange('textAlign', val)} type="select" options={[{value: 'left', label: 'Left'}, {value: 'center', label: 'Center'}, {value: 'right', label: 'Right'}]} />
+                </Accordion>
+                <Accordion title="Background">
+                    <BackgroundPanel styles={currentStyles} palette={websiteData.palette} onStyleChange={handleStyleChange} />
+                </Accordion>
+                <Accordion title="Border">
+                    <StyleInput label="Border Radius" value={currentStyles.borderRadius} onChange={val => handleStyleChange('borderRadius', val)} />
+                </Accordion>
+                 {node.type === 'spacer' &&
+                    <Accordion title="Dimensions">
+                        <StyleInput label="Height" value={currentStyles.height} onChange={val => handleStyleChange('height', val)} />
+                    </Accordion>
+                 }
+             </div>
         </div>
     );
 };
 
-export default SectionEditorForm;
+export default StylePanel;

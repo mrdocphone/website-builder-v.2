@@ -1,6 +1,6 @@
 import { kv } from '@vercel/kv';
 import { v4 as uuidv4 } from 'uuid';
-import type { WebsiteData, Section } from '../types';
+import type { WebsiteData, Section, ResponsiveStyles } from '../types';
 
 export const config = {
   runtime: 'edge',
@@ -16,6 +16,10 @@ async function hashPassword(password: string): Promise<string> {
   return hashHex;
 }
 
+const emptyStyles: ResponsiveStyles = {
+    desktop: {}, tablet: {}, mobile: {}
+};
+
 const createDefaultWebsite = (id: string, name: string): WebsiteData => ({
   id,
   name,
@@ -23,22 +27,32 @@ const createDefaultWebsite = (id: string, name: string): WebsiteData => ({
   tagline: 'Your amazing tagline here!',
   theme: 'light',
   heroImageUrl: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?q=80&w=2071&auto=format&fit=crop',
+  palette: {
+      primary: '#4f46e5',
+      secondary: '#f1f5f9',
+      text: '#334155',
+      accent: '#0ea5e9',
+  },
   children: [
     {
       id: uuidv4(),
       type: 'section',
-      styles: { paddingTop: '2rem', paddingBottom: '2rem' },
+      styles: {
+        desktop: { paddingTop: '2rem', paddingBottom: '2rem' },
+        tablet: {},
+        mobile: {},
+      },
       children: [{
         id: uuidv4(),
         type: 'row',
-        styles: {},
+        styles: emptyStyles,
         children: [{
           id: uuidv4(),
           type: 'column',
-          styles: {},
+          styles: emptyStyles,
           children: [
-            { id: uuidv4(), type: 'headline', styles: { textAlign: 'center' }, content: { level: 'h2', text: 'Welcome to Your New Website' } },
-            { id: uuidv4(), type: 'text', styles: {}, content: { text: 'This is your first section. You can edit this text, change the layout, and add more content using the editor.' } }
+            { id: uuidv4(), type: 'headline', styles: { ...emptyStyles, desktop: { textAlign: 'center' } }, content: { level: 'h2', text: 'Welcome to Your New Website' } },
+            { id: uuidv4(), type: 'text', styles: emptyStyles, content: { text: 'This is your first section. You can edit this text, change the layout, and add more content using the editor.' } }
           ]
         }]
       }]

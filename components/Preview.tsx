@@ -1,15 +1,16 @@
 import React, { useMemo } from 'react';
-import type { WebsiteData, ThemeConfig, Theme, WebsiteNode, Element as ElementType, HeadlineElement, TextElement, ImageElement, ButtonElement, Column } from '../types';
-import { PlusIcon } from './icons';
+import type { WebsiteData, ThemeConfig, Theme, WebsiteNode, Element as IElement, HeadlineElement, TextElement, ImageElement, ButtonElement, VideoElement, IconElement, Column, Device, ResponsiveStyles, StyleProperties, EmbedElement, FormElement } from '../types';
+import { PlusIcon, availableIcons, IconRenderer as Icon } from './icons';
 
 interface PreviewProps {
   websiteData: WebsiteData;
   interactive?: boolean;
+  device?: Device;
   selectedNodeId?: string | null;
   hoveredNodeId?: string | null;
   onSelectNode?: (id: string) => void;
   onHoverNode?: (id: string | null) => void;
-  onAddElement?: (parentId: string, type: ElementType['type']) => void;
+  onUpdateNode?: (id: string, updates: Partial<WebsiteNode>) => void;
 }
 
 const themeConfigs: Record<Theme, ThemeConfig> = {
@@ -20,21 +21,49 @@ const themeConfigs: Record<Theme, ThemeConfig> = {
 };
 
 
-const ElementRenderer: React.FC<{ element: ElementType, theme: ThemeConfig }> = React.memo(({ element, theme }) => {
+const mergeStylesForDevice = (styles: ResponsiveStyles, device: Device): StyleProperties => {
+    const mobile = styles.mobile || {};
+    const tablet = styles.tablet || {};
+    const desktop = styles.desktop || {};
+
+    if (device === 'mobile') {
+        return mobile;
+    }
+    if (device === 'tablet') {
+        return { ...mobile, ...tablet };
+    }
+    return { ...mobile, ...tablet, ...desktop };
+};
+
+
+const ElementRenderer: React.FC<{ 
+    element: IElement, 
+    theme: ThemeConfig,
+    interactive?: boolean;
+    onUpdateNode?: (id: string, updates: Partial<WebsiteNode>) => void;
+}> = React.memo(({ element, theme, interactive, onUpdateNode }) => {
     if (!element.content || typeof element.content !== 'object') {
         return null;
     }
+
+    const handleContentBlur = (e: React.FocusEvent<HTMLElement>) => {
+        if (!interactive || !onUpdateNode) return;
+        const newText = e.currentTarget.innerText;
+        if ((element as any).content.text !== newText) {
+            onUpdateNode(element.id, { content: { ...(element as any).content, text: newText } });
+        }
+    };
   
     switch (element.type) {
         case 'headline': {
             const { level, text } = element.content as HeadlineElement['content'];
             const Tag = (level && ['h1', 'h2', 'h3'].includes(level)) ? level : 'h2';
             const sizeClasses = { h1: 'text-4xl font-bold', h2: 'text-3xl font-bold', h3: 'text-2xl font-semibold' };
-            return ( <Tag className={sizeClasses[Tag]}>{text}</Tag> );
+            return ( <Tag className={sizeClasses[Tag]} contentEditable={interactive} onBlur={handleContentBlur} suppressContentEditableWarning>{text}</Tag> );
         }
         case 'text': {
             const { text } = element.content as TextElement['content'];
-            return ( <p className="whitespace-pre-wrap leading-relaxed">{text}</p> );
+            return ( <p className="whitespace-pre-wrap leading-relaxed" contentEditable={interactive} onBlur={handleContentBlur} suppressContentEditableWarning>{text}</p> );
         }
         case 'image': {
             const { src, alt } = element.content as ImageElement['content'];
@@ -46,9 +75,51 @@ const ElementRenderer: React.FC<{ element: ElementType, theme: ThemeConfig }> = 
             if (!text || !href) { return null; }
             return (
                 <a href={href} className={`inline-block ${theme.primary} ${theme.primaryText} px-6 py-3 rounded-md font-semibold no-underline`}>
-                    <span>{text}</span>
+                    <span contentEditable={interactive} onBlur={handleContentBlur} suppressContentEditableWarning>{text}</span>
                 </a>
             );
+        }
+        case 'spacer': {
+            return <div />;
+        }
+        case 'icon': {
+            const { name } = element.content as IconElement['content'];
+            return <Icon iconName={name} className="w-12 h-12" />;
+        }
+        case 'video': {
+            const { src } = element.content as VideoElement['content'];
+            let embedSrc = '';
+            if (src.includes('youtube.com/watch?v=')) {
+                const videoId = src.split('v=')[1].split('&')[0];
+                embedSrc = `https://www.youtube.com/embed/${videoId}`;
+            } else if (src.includes('youtu.be/')) {
+                const videoId = src.split('youtu.be/')[1].split('?')[0];
+                embedSrc = `https://www.youtube.com/embed/${videoId}`;
+            } else if (src.includes('vimeo.com/')) {
+                const videoId = src.split('vimeo.com/')[1].split('?')[0];
+                embedSrc = `https://player.vimeo.com/video/${videoId}`;
+            }
+            if (!embedSrc) return <div className="p-4 bg-red-100 text-red-700 rounded">Invalid Video URL</div>;
+            return (
+                <div className="aspect-video w-full">
+                    <iframe className="w-full h-full" src={embedSrc} title="Video player" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
+                </div>
+            )
+        }
+        case 'form': {
+            const { buttonText } = element.content as FormElement['content'];
+            return (
+                <form className="preview-form" onSubmit={e => e.preventDefault()}>
+                    <div className="preview-form-field"><label htmlFor="name">Name</label><input type="text" id="name" name="name" /></div>
+                    <div className="preview-form-field"><label htmlFor="email">Email</label><input type="email" id="email" name="email" /></div>
+                    <div className="preview-form-field"><label htmlFor="message">Message</label><textarea id="message" name="message" rows={4}></textarea></div>
+                    <button type="submit" className="preview-form-button">{buttonText}</button>
+                </form>
+            );
+        }
+        case 'embed': {
+            const { html } = element.content as EmbedElement['content'];
+            return <div dangerouslySetInnerHTML={{ __html: html }} />;
         }
         default:
             return null;
@@ -102,21 +173,19 @@ const InteractiveWrapper: React.FC<React.PropsWithChildren<{
 };
 
 const NodeRenderer: React.FC<Omit<PreviewProps, 'websiteData'> & { node: WebsiteNode, theme: ThemeConfig }> = (props) => {
-    const { node, theme } = props;
+    const { node, theme, device = 'desktop' } = props;
 
-    if (!node || !node.id || !node.type) {
-        console.warn('Skipping rendering of invalid node:', node);
-        return null;
-    }
+    if (!node || !node.id || !node.type) { return null; }
     
     const isSelected = props.interactive && props.selectedNodeId === node.id;
     const isHovered = props.interactive && props.hoveredNodeId === node.id && !isSelected;
+    const mergedStyles = mergeStylesForDevice(node.styles, device);
 
     if (!('children' in node) || !Array.isArray(node.children)) {
       return (
         <InteractiveWrapper {...props} node={node} isSelected={isSelected} isHovered={isHovered}>
-            <div style={node.styles || {}}>
-                <ElementRenderer element={node as ElementType} theme={theme} />
+            <div style={mergedStyles}>
+                <ElementRenderer element={node as IElement} theme={theme} interactive={props.interactive} onUpdateNode={props.onUpdateNode} />
             </div>
         </InteractiveWrapper>
       );
@@ -128,34 +197,25 @@ const NodeRenderer: React.FC<Omit<PreviewProps, 'websiteData'> & { node: Website
     switch(node.type) {
         case 'section':
             Tag = 'section';
-            className = 'py-8 px-4 md:py-12 md:px-6';
+            className = 'w-full'; // Simplified: padding now controlled by style panel
             break;
         case 'row':
-            className = 'flex flex-wrap -mx-4';
+            className = 'w-full';
+            mergedStyles.display = 'flex'; // Rows are always flex
             break;
         case 'column':
-            className = 'w-full md:w-1/2 p-4 flex flex-col gap-4';
+            className = 'w-full';
+            mergedStyles.display = 'flex'; // Columns are flex containers for elements
+            mergedStyles.flexDirection = mergedStyles.flexDirection || 'column'; // Default to column
              if ((node as Column).children.length === 0 && props.interactive) {
-                return (
-                    <div className={className}>
-                        <div className="empty-column-placeholder">
-                             <button onClick={() => props.onAddElement?.(node.id, 'headline')} className="bg-slate-200 text-slate-600 px-4 py-2 rounded-md text-sm hover:bg-slate-300">
-                                <PlusIcon className="w-4 h-4 inline-block mr-2" />
-                                Add Element
-                            </button>
-                        </div>
-                    </div>
-                );
+                return <div className="p-4 min-h-[50px] w-full" style={mergedStyles}></div>
             }
-            break;
-        default:
-            console.warn(`Encountered unknown node type: "${(node as any).type}".`);
             break;
     }
 
     return (
         <InteractiveWrapper {...props} node={node} isSelected={isSelected} isHovered={isHovered}>
-            <Tag className={className} style={node.styles || {}}>
+            <Tag className={className} style={mergedStyles}>
                 {node.children
                     .filter(child => child && child.id)
                     .map(child => (

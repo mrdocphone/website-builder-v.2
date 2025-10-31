@@ -23,6 +23,12 @@ const GlobalSettingsForm: React.FC<GlobalSettingsFormProps> = ({ websiteData, se
         if(draft) draft.theme = theme;
     })
   }
+
+  const handlePaletteChange = (colorName: keyof WebsiteData['palette'], value: string) => {
+      setWebsiteData(draft => {
+          if (draft) draft.palette[colorName] = value;
+      })
+  }
   
   const themes: {id: Theme, name: string}[] = [
       {id: 'light', name: 'Light'},
@@ -79,6 +85,18 @@ const GlobalSettingsForm: React.FC<GlobalSettingsFormProps> = ({ websiteData, se
                 ))}
             </div>
           </div>
+        </div>
+      </div>
+      <div>
+        <h3 className="text-lg font-semibold mb-2 text-slate-700">Global Colors</h3>
+        <div className="grid grid-cols-2 gap-4">
+            {/* FIX: Renamed `key` to `paletteKey` to avoid conflict with React's reserved `key` prop, which was causing a TypeScript inference issue. */}
+            {(Object.keys(websiteData.palette) as Array<keyof typeof websiteData.palette>).map(paletteKey => (
+                <div key={paletteKey}>
+                    <label className="text-sm font-medium text-slate-600 block mb-1 capitalize">{paletteKey}</label>
+                    <input type="color" value={websiteData.palette[paletteKey]} onChange={e => handlePaletteChange(paletteKey, e.target.value)} className="w-full h-10 p-1 border border-slate-300 rounded-md"/>
+                </div>
+            ))}
         </div>
       </div>
       <div>
