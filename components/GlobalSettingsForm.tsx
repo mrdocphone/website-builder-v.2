@@ -1,7 +1,8 @@
 import React from 'react';
-import type { WebsiteData, Theme } from '../types';
+import type { WebsiteData, Theme, GlobalColor, GlobalTypography } from '../types';
 import type { Updater } from 'use-immer';
-import { PlusIcon } from './icons';
+import { PlusIcon, TrashIcon, PencilIcon } from './icons';
+import { v4 as uuidv4 } from 'uuid';
 
 interface GlobalSettingsFormProps {
   websiteData: WebsiteData;
@@ -34,6 +35,39 @@ const GlobalSettingsForm: React.FC<GlobalSettingsFormProps> = ({ websiteData, se
       })
   }
   
+    const handleGlobalColorChange = (id: string, field: 'name' | 'value', value: string) => {
+        setWebsiteData(draft => {
+            if (!draft || !draft.globalStyles) return;
+            const color = draft.globalStyles.colors.find(c => c.id === id);
+            if (color) {
+                color[field] = value;
+            }
+        });
+    };
+
+    const addGlobalColor = () => {
+        setWebsiteData(draft => {
+            if (!draft) return;
+            if (!draft.globalStyles) draft.globalStyles = { colors: [], typography: [] };
+            draft.globalStyles.colors.push({ id: uuidv4(), name: 'New Color', value: '#000000' });
+        });
+    };
+    
+    const removeGlobalColor = (id: string) => {
+        setWebsiteData(draft => {
+             if (!draft || !draft.globalStyles) return;
+             draft.globalStyles.colors = draft.globalStyles.colors.filter(c => c.id !== id);
+        });
+    }
+    
+    const addGlobalTypography = () => {
+        setWebsiteData(draft => {
+            if (!draft) return;
+            if (!draft.globalStyles) draft.globalStyles = { colors: [], typography: [] };
+            draft.globalStyles.typography.push({ id: uuidv4(), name: 'New Style', styles: { desktop: {}, tablet: {}, mobile: {} } });
+        });
+    }
+
   const themes: {id: Theme, name: string}[] = [
       {id: 'light', name: 'Light'},
       {id: 'dark', name: 'Dark'},
@@ -53,8 +87,43 @@ const GlobalSettingsForm: React.FC<GlobalSettingsFormProps> = ({ websiteData, se
               <button onClick={() => onSetEditingContext('footer')} className="p-3 bg-slate-50 border rounded-md text-slate-700 font-medium hover:bg-slate-100 hover:border-slate-300">Edit Footer</button>
            </div>
        </div>
+        <div>
+            <h3 className="text-lg font-semibold mb-2 text-slate-700">Global Styles</h3>
+            {/* Global Colors */}
+            <div>
+                <div className="flex justify-between items-center mb-2">
+                    <h4 className="font-semibold text-slate-600">Colors</h4>
+                    <button onClick={addGlobalColor} className="text-indigo-600 hover:text-indigo-800"><PlusIcon className="w-5 h-5"/></button>
+                </div>
+                <div className="space-y-2">
+                    {websiteData.globalStyles?.colors.map(color => (
+                        <div key={color.id} className="flex items-center gap-2">
+                            <input type="color" value={color.value} onChange={e => handleGlobalColorChange(color.id, 'value', e.target.value)} className="w-8 h-8 p-0 border-none rounded" />
+                            <input type="text" value={color.name} onChange={e => handleGlobalColorChange(color.id, 'name', e.target.value)} className="flex-grow p-1 border rounded text-sm"/>
+                            <button onClick={() => removeGlobalColor(color.id)}><TrashIcon className="w-4 h-4 text-red-500"/></button>
+                        </div>
+                    ))}
+                </div>
+            </div>
+             {/* Global Typography */}
+            <div className="mt-4">
+                <div className="flex justify-between items-center mb-2">
+                    <h4 className="font-semibold text-slate-600">Typography</h4>
+                    <button onClick={addGlobalTypography} className="text-indigo-600 hover:text-indigo-800"><PlusIcon className="w-5 h-5"/></button>
+                </div>
+                 <div className="space-y-2">
+                     {websiteData.globalStyles?.typography.map(typo => (
+                        <div key={typo.id} className="p-2 border rounded text-sm flex justify-between items-center">
+                            <span>{typo.name}</span>
+                            <button><PencilIcon className="w-4 h-4"/></button>
+                        </div>
+                     ))}
+                 </div>
+            </div>
+        </div>
+
       <div>
-        <h3 className="text-lg font-semibold mb-2 text-slate-700">Global Settings</h3>
+        <h3 className="text-lg font-semibold mb-2 text-slate-700">General Settings</h3>
         <div className="space-y-4">
           <div>
             <label className="text-sm font-medium text-slate-600 block mb-1">Website Name</label>
@@ -65,53 +134,15 @@ const GlobalSettingsForm: React.FC<GlobalSettingsFormProps> = ({ websiteData, se
               className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm"
             />
           </div>
-           <div>
-            <label className="text-sm font-medium text-slate-600 block mb-1">Theme</label>
-            <div className="grid grid-cols-2 gap-2">
-                {themes.map(theme => (
-                    <button 
-                        key={theme.id}
-                        onClick={() => handleThemeChange(theme.id)}
-                        className={`p-2 rounded-md border-2 ${websiteData.theme === theme.id ? 'border-indigo-500' : 'border-transparent'}`}
-                    >
-                       <div className={`w-full h-12 rounded bg-gradient-to-br from-${theme.id === 'light' ? 'white' : theme.id === 'dark' ? 'gray-800' : `${theme.id}-50`} to-${theme.id === 'light' ? 'slate-100' : theme.id === 'dark' ? 'gray-700' : `${theme.id}-200`} flex items-center justify-center`}>
-                           <span className={`font-semibold text-sm ${websiteData.theme === theme.id ? 'text-indigo-600' : 'text-slate-700'}`}>{theme.name}</span>
-                       </div>
-                    </button>
-                ))}
-            </div>
-          </div>
-        </div>
-      </div>
-      <div>
-        <h3 className="text-lg font-semibold mb-2 text-slate-700">Global Styling</h3>
-         <div className="space-y-4">
              <div>
                 <label className="text-sm font-medium text-slate-600 block mb-1">Google Font</label>
                 <select value={websiteData.googleFont || 'Roboto'} onChange={e => handleInputChange('googleFont', e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm">
                     {googleFonts.map(font => <option key={font} value={font}>{font}</option>)}
                 </select>
              </div>
-              <div>
-                <label className="text-sm font-medium text-slate-600 block mb-1">Cursor Style</label>
-                <select value={websiteData.customCursor || 'default'} onChange={e => handleInputChange('customCursor', e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm">
-                    {customCursors.map(cursor => <option key={cursor} value={cursor}>{cursor}</option>)}
-                </select>
-             </div>
-         </div>
-      </div>
-      <div>
-        <h3 className="text-lg font-semibold mb-2 text-slate-700">Global Colors</h3>
-        <div className="grid grid-cols-2 gap-4">
-            {/* FIX: Corrected the type assertion for Object.keys to match the expected type in handlePaletteChange, ensuring type safety. */}
-            {(Object.keys(websiteData.palette) as (keyof WebsiteData['palette'])[]).map(paletteKey => (
-                <div key={paletteKey}>
-                    <label className="text-sm font-medium text-slate-600 block mb-1 capitalize">{paletteKey}</label>
-                    <input type="color" value={websiteData.palette[paletteKey]} onChange={e => handlePaletteChange(paletteKey, e.target.value)} className="w-full h-10 p-1 border border-slate-300 rounded-md"/>
-                </div>
-            ))}
         </div>
       </div>
+     
        <div>
         <h3 className="text-lg font-semibold mb-2 text-slate-700">SEO & Metadata</h3>
         <div className="space-y-4">
@@ -125,6 +156,16 @@ const GlobalSettingsForm: React.FC<GlobalSettingsFormProps> = ({ websiteData, se
               placeholder="/favicon.ico"
             />
           </div>
+           <div>
+                <label className="text-sm font-medium text-slate-600 block mb-1">Custom Head Code</label>
+                <textarea
+                    value={websiteData.customHeadCode || ''}
+                    onChange={(e) => handleInputChange('customHeadCode', e.target.value)}
+                    className="w-full h-24 p-2 border rounded-md font-mono text-xs"
+                    placeholder={`<script src="..."></script>`}
+                />
+                 <p className="text-xs text-slate-500 mt-1">Add scripts like Google Analytics. This code will be added to every page.</p>
+            </div>
         </div>
       </div>
     </div>

@@ -1,6 +1,3 @@
-
-
-
 // Vercel Serverless Function
 // This function retrieves website data from Vercel KV by its slug.
 import { kv } from '@vercel/kv';

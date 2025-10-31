@@ -1,5 +1,3 @@
-
-
 // Vercel Serverless Function
 import { kv } from '@vercel/kv';
 import type { WebsiteData } from '../types';

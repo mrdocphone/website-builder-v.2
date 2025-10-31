@@ -1,7 +1,5 @@
-
-
-import React, { useMemo } from 'react';
-import type { WebsiteData, ThemeConfig, Theme, WebsiteNode, Element as IElement, HeadlineElement, TextElement, ImageElement, ButtonElement, VideoElement, IconElement, Column, Device, ResponsiveStyles, StyleProperties, EmbedElement, FormElement, Page, NavigationElement, GalleryElement, DividerElement, MapElement } from '../types';
+import React, { useMemo, useState } from 'react';
+import type { WebsiteData, ThemeConfig, Theme, WebsiteNode, Element as IElement, HeadlineElement, TextElement, ImageElement, ButtonElement, VideoElement, IconElement, Column, Device, ResponsiveStyles, StyleProperties, EmbedElement, FormElement, Page, NavigationElement, GalleryElement, DividerElement, MapElement, AccordionElement, TabsElement, SocialIconsElement, FormField } from '../types';
 import { PlusIcon, availableIcons, IconRenderer as Icon } from './icons';
 import AiToolbar from './AiToolbar';
 import RichTextToolbar from './RichTextToolbar';
@@ -13,13 +11,14 @@ interface PreviewProps {
   device?: Device;
   selectedNodeId?: string | null;
   hoveredNodeId?: string | null;
-  onSelectNode?: (id: string) => void;
+  onSelectNode?: (id: string, e: React.MouseEvent) => void;
   onHoverNode?: (id: string | null) => void;
   onUpdateNode?: (id: string, updates: Partial<WebsiteNode>) => void;
   onAiTextUpdate?: (nodeId: string, action: string, options?: { tone?: string }) => void;
   isAiLoading?: boolean;
   onContextMenuRequest?: (e: React.MouseEvent, nodeId: string) => void;
   onAddSection?: (context: 'page' | 'header' | 'footer') => void;
+  onDuplicateNode?: (id: string) => void;
 }
 
 const themeConfigs: Record<Theme, ThemeConfig> = {
@@ -45,6 +44,47 @@ const mergeStylesForDevice = (styles: ResponsiveStyles, device: Device): StylePr
 };
 
 
+// NEW: Accordion Preview Component
+const Accordion: React.FC<{ element: AccordionElement }> = ({ element }) => {
+    const [openItem, setOpenItem] = useState<string | null>(null);
+    return (
+        <div className="preview-accordion">
+            {element.content.items.map(item => (
+                <div key={item.id} className="preview-accordion-item">
+                    <div className="preview-accordion-title" onClick={() => setOpenItem(openItem === item.id ? null : item.id)}>
+                        {item.title}
+                        <span>{openItem === item.id ? '-' : '+'}</span>
+                    </div>
+                    {openItem === item.id && <div className="preview-accordion-content">{item.content}</div>}
+                </div>
+            ))}
+        </div>
+    );
+};
+
+// NEW: Tabs Preview Component
+const Tabs: React.FC<{ element: TabsElement; onUpdateNode?: PreviewProps['onUpdateNode'], interactive?: boolean }> = ({ element, ...props }) => {
+    const [activeTab, setActiveTab] = useState(element.content.items[0]?.id || null);
+    const activeItem = element.content.items.find(item => item.id === activeTab);
+    return (
+        <div className="preview-tabs">
+            <div className="preview-tabs-nav">
+                {element.content.items.map(item => (
+                    <button key={item.id} onClick={() => setActiveTab(item.id)} className={`preview-tab-button ${activeTab === item.id ? 'active' : ''}`}>
+                        {item.title}
+                    </button>
+                ))}
+            </div>
+            <div className="preview-tab-content">
+                {activeItem?.content.map(child => (
+                    <NodeRenderer key={child.id} node={child} theme={themeConfigs.light} context="page" {...props} />
+                ))}
+            </div>
+        </div>
+    );
+};
+
+
 const ElementRenderer: React.FC<{ 
     element: IElement, 
     theme: ThemeConfig,
@@ -65,9 +105,8 @@ const ElementRenderer: React.FC<{
     switch (element.type) {
         case 'headline': {
             const { level, text } = element.content as HeadlineElement['content'];
-            const Tag = (level && ['h1', 'h2', 'h3'].includes(level)) ? level : 'h2';
-            const sizeClasses = { h1: 'text-4xl font-bold', h2: 'text-3xl font-bold', h3: 'text-2xl font-semibold' };
-            return ( <Tag className={sizeClasses[Tag]} contentEditable={interactive} onInput={handleContentInput} suppressContentEditableWarning dangerouslySetInnerHTML={{ __html: text }} /> );
+            const Tag = (level && ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(level)) ? level : 'h2';
+            return ( <Tag contentEditable={interactive} onInput={handleContentInput} suppressContentEditableWarning dangerouslySetInnerHTML={{ __html: text }} /> );
         }
         case 'text': {
             const { text } = element.content as TextElement['content'];
@@ -102,17 +141,25 @@ const ElementRenderer: React.FC<{
             return <Icon iconName={name} className="w-12 h-12" />;
         }
         case 'video': {
-            const { src } = element.content as VideoElement['content'];
+            const { src, autoplay, loop, muted, controls } = element.content as VideoElement['content'];
             let embedSrc = '';
+            const queryParams = new URLSearchParams();
+            if (autoplay) queryParams.set('autoplay', '1');
+            if (loop) queryParams.set('loop', '1');
+            if (muted) queryParams.set('mute', '1');
+            if (controls === false) queryParams.set('controls', '0');
+
             if (src.includes('youtube.com/watch?v=')) {
                 const videoId = src.split('v=')[1].split('&')[0];
-                embedSrc = `https://www.youtube.com/embed/${videoId}`;
+                if (loop) queryParams.set('playlist', videoId); // YouTube loop requires playlist
+                embedSrc = `https://www.youtube.com/embed/${videoId}?${queryParams.toString()}`;
             } else if (src.includes('youtu.be/')) {
                 const videoId = src.split('youtu.be/')[1].split('?')[0];
-                embedSrc = `https://www.youtube.com/embed/${videoId}`;
+                if (loop) queryParams.set('playlist', videoId);
+                embedSrc = `https://www.youtube.com/embed/${videoId}?${queryParams.toString()}`;
             } else if (src.includes('vimeo.com/')) {
                 const videoId = src.split('vimeo.com/')[1].split('?')[0];
-                embedSrc = `https://player.vimeo.com/video/${videoId}`;
+                embedSrc = `https://player.vimeo.com/video/${videoId}?${queryParams.toString()}`;
             }
             if (!embedSrc) return <div className="p-4 bg-red-100 text-red-700 rounded">Invalid Video URL</div>;
             return (
@@ -122,12 +169,28 @@ const ElementRenderer: React.FC<{
             )
         }
         case 'form': {
-            const { buttonText } = element.content as FormElement['content'];
+            const { buttonText, fields } = element.content as FormElement['content'];
+             if (interactive && (!fields || fields.length === 0)) {
+                return <div className="p-8 text-center bg-slate-50 border-dashed border-2 rounded-md text-slate-500">Form fields can be added in the Style Panel.</div>;
+            }
             return (
-                <form className="preview-form" onSubmit={e => e.preventDefault()}>
-                    <div className="preview-form-field"><label htmlFor="name">Name</label><input type="text" id="name" name="name" /></div>
-                    <div className="preview-form-field"><label htmlFor="email">Email</label><input type="email" id="email" name="email" /></div>
-                    <div className="preview-form-field"><label htmlFor="message">Message</label><textarea id="message" name="message" rows={4}></textarea></div>
+                <form className="preview-form space-y-4" onSubmit={e => e.preventDefault()}>
+                     {fields.map(field => (
+                        <div key={field.id} className="preview-form-field">
+                            <label htmlFor={field.id}>{field.label} {field.required && '*'}</label>
+                            {field.type === 'textarea' ? (
+                                <textarea id={field.id} name={field.label} placeholder={field.placeholder} required={field.required} rows={4} />
+                            ) : field.type === 'select' ? (
+                                <select id={field.id} name={field.label} required={field.required}>
+                                    {field.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                </select>
+                            ) : field.type === 'checkbox' ? (
+                                <div className="flex items-center gap-2"><input type="checkbox" id={field.id} name={field.label} required={field.required} /> <span>{field.placeholder}</span></div>
+                            ) : (
+                                <input type={field.type} id={field.id} name={field.label} placeholder={field.placeholder} required={field.required} />
+                            )}
+                        </div>
+                    ))}
                     <button type="submit" className="preview-form-button">{buttonText}</button>
                 </form>
             );
@@ -140,7 +203,7 @@ const ElementRenderer: React.FC<{
             return (
                 <nav className="preview-nav w-full">
                     <ul>
-                        {websiteData.pages.map(page => (
+                        {websiteData.pages.filter(p => !p.isDraft).map(page => (
                             <li key={page.id}><a href={`/${page.slug}`}>{page.name}</a></li>
                         ))}
                     </ul>
@@ -164,6 +227,16 @@ const ElementRenderer: React.FC<{
                 </div>
             )
         }
+        case 'accordion': return <Accordion element={element as AccordionElement} />;
+        case 'tabs': return <Tabs element={element as TabsElement} onUpdateNode={onUpdateNode} interactive={interactive} />;
+        case 'socialIcons': {
+            const { networks } = element.content as SocialIconsElement['content'];
+            return (
+                <div className="flex gap-4">
+                    {networks.map(n => <a key={n.id} href={n.url} target="_blank" rel="noopener noreferrer">{n.network}</a>)}
+                </div>
+            )
+        }
         default:
             return null;
     }
@@ -175,13 +248,14 @@ const InteractiveWrapper: React.FC<React.PropsWithChildren<{
     interactive?: boolean;
     isSelected?: boolean;
     isHovered?: boolean;
-    onSelect?: (id: string) => void;
+    onSelect?: (id: string, e: React.MouseEvent) => void;
     onHover?: (id: string | null) => void;
     onUpdateNode?: (id: string, updates: Partial<WebsiteNode>) => void;
     onAiTextUpdate?: (nodeId: string, action: string, options?: { tone?: string }) => void;
     isAiLoading?: boolean;
     onContextMenuRequest?: (e: React.MouseEvent, nodeId: string) => void;
-}>> = ({ children, node, interactive, isSelected, isHovered, onSelect, onHover, onUpdateNode, onAiTextUpdate, isAiLoading, onContextMenuRequest }) => {
+    onDuplicateNode?: (id: string) => void;
+}>> = ({ children, node, interactive, isSelected, isHovered, onSelect, onHover, onUpdateNode, onAiTextUpdate, isAiLoading, onContextMenuRequest, onDuplicateNode }) => {
     if (!interactive) {
         return <div data-node-id={node.id}>{children}</div>;
     }
@@ -189,7 +263,7 @@ const InteractiveWrapper: React.FC<React.PropsWithChildren<{
     const handleClick = (e: React.MouseEvent) => {
         if (node.locked) return;
         e.stopPropagation();
-        onSelect?.(node.id);
+        onSelect?.(node.id, e);
     };
 
     const handleMouseEnter = (e: React.MouseEvent) => {
@@ -203,6 +277,7 @@ const InteractiveWrapper: React.FC<React.PropsWithChildren<{
         onHover?.(null);
     };
     
+    // FIX: Add a null check on rightClickedNode before accessing its properties.
     const handleContextMenu = (e: React.MouseEvent) => {
         if (!interactive || !onContextMenuRequest) return;
         e.preventDefault();
@@ -295,7 +370,6 @@ const NodeRenderer: React.FC<Omit<PreviewProps, 'websiteData' | 'activePage'> & 
             Tag = 'section';
             className = 'w-full';
             if (node.animation && node.animation !== 'none') {
-                className += ` gjs-animation-section ${node.animation}`;
                 dataAttributes['data-animation'] = node.animation;
             }
             break;

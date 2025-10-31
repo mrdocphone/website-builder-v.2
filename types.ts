@@ -132,13 +132,13 @@ interface StructureNode<T extends string> {
   customName?: string; // For layer renaming
   styles: ResponsiveStyles;
   hoverStyles?: ResponsiveStyles; // For hover effects
-  animation?: 'none' | 'fadeIn' | 'slideInUp';
+  animation?: 'none' | 'fadeIn' | 'slideInUp' | 'slideInLeft' | 'slideInRight' | 'scaleUp';
   locked?: boolean; // To prevent editing
   visibility?: { // To hide on specific devices
       [key in Device]?: boolean;
   };
   customCss?: string;
-  globalStyles?: string[]; // Array of global style IDs
+  globalTypographyId?: string; // ID of a global typography style
 }
 
 // CONTENT ELEMENT TYPES
@@ -163,10 +163,29 @@ export interface IconElement extends StructureNode<'icon'> {
     content: { name: string };
 }
 export interface VideoElement extends StructureNode<'video'> {
-    content: { src: string };
+    content: { 
+        src: string;
+        autoplay?: boolean;
+        loop?: boolean;
+        muted?: boolean;
+        controls?: boolean;
+    };
+}
+// NEW: Advanced Form Element
+export type FormFieldType = 'text' | 'email' | 'textarea' | 'checkbox' | 'select';
+export interface FormField {
+    id: string;
+    type: FormFieldType;
+    label: string;
+    placeholder?: string;
+    required?: boolean;
+    options?: string[]; // For select type
 }
 export interface FormElement extends StructureNode<'form'> {
-    content: { buttonText: string };
+    content: { 
+        buttonText: string;
+        fields: FormField[];
+    };
 }
 export interface EmbedElement extends StructureNode<'embed'> {
     content: { html: string };
@@ -244,6 +263,7 @@ export interface Page {
   metaDescription?: string;
   ogImageUrl?: string; // Social sharing image
   customHeadCode?: string; // Per-page custom code
+  customBodyCode?: string; // Per-page custom code (end of body)
   children: Section[];
 }
 
@@ -264,7 +284,7 @@ export interface WebsiteData {
       text: string;
       accent: string;
   };
-  globalStyles?: {
+  globalStyles: {
       colors: GlobalColor[];
       typography: GlobalTypography[];
   };

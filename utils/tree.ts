@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import type { WebsiteNode, Section, Row, Column, Element, ResponsiveStyles, Page } from '../types';
+import type { WebsiteNode, Section, Row, Column, Element, ResponsiveStyles, Page, FormField } from '../types';
 
 // Recursive function to find a node by its ID
 export function findNodeById(nodes: WebsiteNode[], id: string): WebsiteNode | null {
@@ -16,6 +16,24 @@ export function findNodeById(nodes: WebsiteNode[], id: string): WebsiteNode | nu
   }
   return null;
 }
+
+// NEW: Recursive function to find the path (ancestry) of a node
+export function findNodePath(nodes: WebsiteNode[], id: string, path: WebsiteNode[] = []): WebsiteNode[] | null {
+    for (const node of nodes) {
+        const currentPath = [...path, node];
+        if (node.id === id) {
+            return currentPath;
+        }
+        if ('children' in node && Array.isArray(node.children)) {
+            const foundPath = findNodePath(node.children as WebsiteNode[], id, currentPath);
+            if (foundPath) {
+                return foundPath;
+            }
+        }
+    }
+    return null;
+}
+
 
 // Immer-compatible function to update a node
 export function updateNodeById(nodes: WebsiteNode[], id: string, updates: Partial<WebsiteNode>): boolean {
@@ -85,7 +103,7 @@ const createDefaultStyles = (): ResponsiveStyles => ({
 });
 
 
-const createDefaultElement = (type: Element['type']): Element => {
+export const createDefaultElement = (type: Element['type']): Element => {
     const base = { id: uuidv4(), styles: createDefaultStyles(), visibility: { desktop: true, tablet: true, mobile: true } };
     switch(type) {
         case 'headline': return { ...base, type: 'headline', content: { level: 'h2', text: 'New Headline' } };
@@ -94,8 +112,8 @@ const createDefaultElement = (type: Element['type']): Element => {
         case 'button': return { ...base, type: 'button', content: { text: 'Click Me', href: '#' } };
         case 'spacer': return { ...base, type: 'spacer', content: {}, styles: { desktop: { height: '2rem'}, tablet: {}, mobile: {} }};
         case 'icon': return { ...base, type: 'icon', content: { name: 'star' } };
-        case 'video': return { ...base, type: 'video', content: { src: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' } };
-        case 'form': return { ...base, type: 'form', content: { buttonText: 'Submit' } };
+        case 'video': return { ...base, type: 'video', content: { src: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', controls: true } };
+        case 'form': return { ...base, type: 'form', content: { buttonText: 'Submit', fields: [ { id: uuidv4(), type: 'text', label: 'Name', required: true}, { id: uuidv4(), type: 'email', label: 'Email', required: true } ] } };
         case 'embed': return { ...base, type: 'embed', content: { html: '<p class="p-4 bg-slate-100 rounded text-center">Your embedded content will show here.</p>' } };
         case 'navigation': return { ...base, type: 'navigation', content: {} };
         case 'gallery': return { ...base, type: 'gallery', content: { images: [ { src: 'https://images.unsplash.com/photo-1599420186946-7b6fb4e297f0?q=80&w=1887', alt: 'Placeholder 1'}, { src: 'https://images.unsplash.com/photo-1581093450021-4a7360e9a1c8?q=80&w=1887', alt: 'Placeholder 2'}, { src: 'https://images.unsplash.com/photo-1518770660439-4636190af475?q=80&w=2070', alt: 'Placeholder 3'}, { src: 'https://images.unsplash.com/photo-1620712943543-2858200f7426?q=80&w=2070', alt: 'Placeholder 4'} ]} };
@@ -150,28 +168,38 @@ export const addNode = (draft: { children: WebsiteNode[] }, parentId: string, ty
 };
 
 // Deep copy a node and assign new IDs to it and all its children.
-function deepCloneWithNewIds(node: any): any {
+export function deepCloneWithNewIds(node: any): any {
     const newNode = { ...node, id: uuidv4() };
 
     if (Array.isArray(newNode.children)) {
         newNode.children = newNode.children.map(deepCloneWithNewIds);
     }
     
-    // Also handle nested content structures like Tabs
-    if (typeof newNode.content === 'object' && newNode.content !== null && Array.isArray(newNode.content.items)) {
-        newNode.content.items = newNode.content.items.map((item: any) => {
-             const newItem = {...item, id: uuidv4()};
-             if (Array.isArray(newItem.content)) {
-                 newItem.content = newItem.content.map(deepCloneWithNewIds);
-             }
-             return newItem;
-        });
+    // Also handle nested content structures like Tabs and Accordions
+    if (typeof newNode.content === 'object' && newNode.content !== null) {
+        if (Array.isArray(newNode.content.items)) {
+            newNode.content.items = newNode.content.items.map((item: any) => {
+                 const newItem = {...item, id: uuidv4()};
+                 if (Array.isArray(newItem.content)) { // For Tabs
+                     newItem.content = newItem.content.map(deepCloneWithNewIds);
+                 }
+                 return newItem;
+            });
+        }
+        if (Array.isArray(newNode.content.fields)) { // For Forms
+            newNode.content.fields = newNode.content.fields.map((field: FormField) => ({
+                ...field,
+                id: uuidv4(),
+            }));
+        }
     }
+
 
     return newNode;
 }
 
 // Finds a node, duplicates it, and inserts the copy next to the original.
+// FIX: Correctly handle duplication for root-level nodes (sections).
 export function duplicateNodeById(nodes: WebsiteNode[], id: string): boolean {
     for (let i = 0; i < nodes.length; i++) {
         const node = nodes[i];

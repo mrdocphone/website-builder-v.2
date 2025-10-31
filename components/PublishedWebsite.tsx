@@ -1,6 +1,5 @@
-
-
-import React, { useState, useEffect, useMemo } from 'react';
+// FIX: Import `useCallback` from react.
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import type { WebsiteData, Page, WebsiteNode } from '../types';
 import Preview from './Preview';
@@ -20,6 +19,23 @@ const findHoverStyles = (nodes: WebsiteNode[]): { id: string; styles: any }[] =>
     return styles;
 };
 
+const PasswordPrompt: React.FC<{ onSubmit: (password: string) => void }> = ({ onSubmit }) => {
+    const [password, setPassword] = useState('');
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        onSubmit(password);
+    };
+    return (
+        <div className="w-screen h-screen flex items-center justify-center bg-slate-100">
+            <form onSubmit={handleSubmit} className="p-8 bg-white rounded-lg shadow-md">
+                <h2 className="text-lg font-semibold mb-4">Password Required</h2>
+                <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full p-2 border rounded mb-4" />
+                <button type="submit" className="w-full bg-indigo-600 text-white p-2 rounded">Submit</button>
+            </form>
+        </div>
+    );
+};
+
 const PublishedWebsite: React.FC = () => {
   const { username, slug } = useParams<{ username: string; slug?: string }>();
   // The API now returns the full WebsiteData object which includes the specific page data.
@@ -27,63 +43,91 @@ const PublishedWebsite: React.FC = () => {
   const [pageData, setPageData] = useState<Page | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [passwordRequired, setPasswordRequired] = useState(false);
 
-  useEffect(() => {
-    const fetchWebsiteData = async () => {
-        if (!username) {
-            setError("Username not found in URL.");
-            setIsLoading(false);
-            return;
-        }
+  const fetchWebsiteData = useCallback(async (password?: string) => {
+      if (!username) {
+          setError("Username not found in URL.");
+          setIsLoading(false);
+          return;
+      }
 
-        setIsLoading(true);
-        setError(null);
-        
-        const queryParams = new URLSearchParams({ username });
-        if (slug) {
-            queryParams.append('slug', slug);
-        }
+      setIsLoading(true);
+      setError(null);
+      setPasswordRequired(false);
+      
+      const queryParams = new URLSearchParams({ username });
+      if (slug) {
+          queryParams.append('slug', slug);
+      }
+      
+      const headers = new Headers();
+      if (password) {
+          headers.append('x-password', password);
+      }
 
-        try {
-            const response = await fetch(`/api/site?${queryParams.toString()}`);
+      try {
+          const response = await fetch(`/api/site?${queryParams.toString()}`, { headers });
 
-            if (response.status === 404) {
-                throw new Error("We couldn't find a website at this address. Please check the URL.");
-            }
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.message || "An error occurred while loading the website.");
-            }
+          if (response.status === 404) {
+              throw new Error("We couldn't find a website at this address. Please check the URL.");
+          }
+          if (!response.ok) {
+              const errorData = await response.json().catch(() => ({}));
+              throw new Error(errorData.message || "An error occurred while loading the website.");
+          }
 
-            const parsedData = await response.json();
-            setWebsiteData(parsedData.site);
-            setPageData(parsedData.page);
-            
+          const parsedData = await response.json();
 
-        } catch (e) {
-            setError(e instanceof Error ? e.message : "An unknown error occurred.");
-            console.error("Failed to load website data", e);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-    
-    fetchWebsiteData();
+          if (parsedData.passwordRequired) {
+              setPasswordRequired(true);
+          } else {
+              setWebsiteData(parsedData.site);
+              setPageData(parsedData.page);
+          }
 
+      } catch (e) {
+          setError(e instanceof Error ? e.message : "An unknown error occurred.");
+          console.error("Failed to load website data", e);
+      } finally {
+          setIsLoading(false);
+      }
   }, [username, slug]);
+  
+  useEffect(() => {
+    fetchWebsiteData();
+  }, [fetchWebsiteData]);
   
   useEffect(() => {
     if (websiteData && pageData) {
         document.title = pageData.metaTitle || websiteData.name;
         document.body.style.fontFamily = websiteData.googleFont ? `'${websiteData.googleFont}', sans-serif` : 'sans-serif';
 
-        let metaDescription = document.querySelector('meta[name="description"]');
-        if (!metaDescription) {
-            metaDescription = document.createElement('meta');
-            metaDescription.setAttribute('name', 'description');
-            document.head.appendChild(metaDescription);
+        const updateMeta = (name: string, content: string) => {
+            let el = document.querySelector(`meta[name="${name}"]`);
+            if (!el) {
+                el = document.createElement('meta');
+                el.setAttribute('name', name);
+                document.head.appendChild(el);
+            }
+            el.setAttribute('content', content);
+        };
+        const updateOg = (property: string, content: string) => {
+            let el = document.querySelector(`meta[property="${property}"]`);
+            if (!el) {
+                el = document.createElement('meta');
+                el.setAttribute('property', property);
+                document.head.appendChild(el);
+            }
+            el.setAttribute('content', content);
+        };
+
+        updateMeta('description', pageData.metaDescription || pageData.tagline || '');
+        updateOg('og:title', pageData.metaTitle || websiteData.name);
+        updateOg('og:description', pageData.metaDescription || pageData.tagline || '');
+        if (pageData.ogImageUrl) {
+            updateOg('og:image', pageData.ogImageUrl);
         }
-        metaDescription.setAttribute('content', pageData.metaDescription || pageData.tagline || '');
 
         let favicon = document.querySelector('link[rel="icon"]');
         if (!favicon) {
@@ -99,6 +143,20 @@ const PublishedWebsite: React.FC = () => {
             if (fontLink) {
                  fontLink.href = `https://fonts.googleapis.com/css2?family=${websiteData.googleFont.replace(/ /g, '+')}:wght@400;700&display=swap`;
             }
+        }
+        
+        // Custom Head Code
+        if (websiteData.customHeadCode || pageData.customHeadCode) {
+            const code = (websiteData.customHeadCode || '') + (pageData.customHeadCode || '');
+            const scriptEl = document.createElement('div');
+            scriptEl.innerHTML = code;
+            Array.from(scriptEl.children).forEach(child => document.head.appendChild(child.cloneNode(true)));
+        }
+         // Custom Body Code
+        if (pageData.customBodyCode) {
+            const bodyDiv = document.createElement('div');
+            bodyDiv.innerHTML = pageData.customBodyCode;
+            Array.from(bodyDiv.children).forEach(child => document.body.appendChild(child.cloneNode(true)));
         }
     }
   }, [websiteData, pageData]);
@@ -170,6 +228,10 @@ const PublishedWebsite: React.FC = () => {
         </div>
       </div>
     );
+  }
+  
+  if (passwordRequired) {
+      return <PasswordPrompt onSubmit={(password) => fetchWebsiteData(password)} />;
   }
 
   if (!websiteData || !pageData) {

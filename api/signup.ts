@@ -1,6 +1,3 @@
-
-
-
 import { kv } from '@vercel/kv';
 import { v4 as uuidv4 } from 'uuid';
 import type { WebsiteData, Page, ResponsiveStyles } from '../types';
@@ -66,6 +63,7 @@ const createDefaultWebsite = (id: string, name: string): WebsiteData => {
     name,
     theme: 'light',
     faviconUrl: '/favicon.ico',
+    customHeadCode: '',
     header: [],
     footer: [],
     palette: {
