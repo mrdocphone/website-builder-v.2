@@ -1,6 +1,4 @@
 
-
-
 export type Theme = 'light' | 'dark' | 'ocean' | 'forest';
 export type Device = 'desktop' | 'tablet' | 'mobile';
 
@@ -74,50 +72,36 @@ export interface StyleProperties {
   maxWidth?: string;
   minHeight?: string;
   maxHeight?: string;
-  // Layout (Flexbox & Grid)
-  display?: 'flex' | 'grid' | 'block' | 'inline-block' | 'inline' | 'none';
-  // Flex Container
-  flexDirection?: 'row' | 'column';
-  justifyContent?: 'flex-start' | 'flex-end' | 'center' | 'space-between' | 'space-around' | 'space-evenly';
-  alignItems?: 'flex-start' | 'flex-end' | 'center' | 'stretch' | 'baseline';
-  flexWrap?: 'nowrap' | 'wrap' | 'wrap-reverse';
-  // Flex Child
+  // Flexbox & Grid
+  display?: 'block' | 'inline-block' | 'flex' | 'grid' | 'none';
+  flexDirection?: 'row' | 'column' | 'row-reverse' | 'column-reverse';
+  justifyContent?: 'flex-start' | 'center' | 'flex-end' | 'space-between' | 'space-around' | 'space-evenly';
+  alignItems?: 'flex-start' | 'center' | 'flex-end' | 'stretch' | 'baseline';
+  alignSelf?: 'auto' | 'flex-start' | 'center' | 'flex-end' | 'stretch' | 'baseline';
+  flexGrow?: string | number;
+  flexShrink?: string | number;
   flexBasis?: string;
-  flexGrow?: string;
-  flexShrink?: string;
-  alignSelf?: 'auto' | 'flex-start' | 'flex-end' | 'center' | 'stretch' | 'baseline';
-  order?: string;
-  // Grid Container
+  flexWrap?: 'nowrap' | 'wrap' | 'wrap-reverse';
   gridTemplateColumns?: string;
   gridTemplateRows?: string;
-  gridColumnGap?: string;
-  gridRowGap?: string;
-  // Grid Child
-  gridColumnStart?: string;
-  gridColumnEnd?: string;
-  gridRowStart?: string;
-  gridRowEnd?: string;
-  // Positioning
+  // Position
   position?: 'static' | 'relative' | 'absolute' | 'fixed' | 'sticky';
   top?: string;
-  right?: string;
   bottom?: string;
   left?: string;
-  zIndex?: string;
-  // Effects & Misc
+  right?: string;
+  zIndex?: number;
+  // Effects
+  opacity?: number | string;
   boxShadow?: string;
-  opacity?: string;
-  overflow?: 'visible' | 'hidden' | 'scroll' | 'auto';
-  cursor?: string;
-  filter?: string; // For image filters
   transform?: string;
-  transformOrigin?: string;
-  transition?: string;
-  aspectRatio?: string;
+  filter?: string;
+  // Misc
   objectFit?: 'cover' | 'contain' | 'fill' | 'none' | 'scale-down';
-  objectPosition?: string;
+  aspectRatio?: string;
+  cursor?: string;
+  overflow?: 'visible' | 'hidden' | 'scroll' | 'auto';
 }
-
 
 export type ResponsiveStyles = {
     desktop: StyleProperties;
@@ -125,184 +109,121 @@ export type ResponsiveStyles = {
     mobile: StyleProperties;
 }
 
-// BASE STRUCTURE for all editable items
-interface StructureNode<T extends string> {
-  id: string;
-  type: T;
-  customName?: string; // For layer renaming
-  styles: ResponsiveStyles;
-  hoverStyles?: ResponsiveStyles; // For hover effects
-  animation?: 'none' | 'fadeIn' | 'slideInUp' | 'slideInLeft' | 'slideInRight' | 'scaleUp';
-  locked?: boolean; // To prevent editing
-  visibility?: { // To hide on specific devices
-      [key in Device]?: boolean;
-  };
-  customCss?: string;
-  globalTypographyId?: string; // ID of a global typography style
-}
-
-// CONTENT ELEMENT TYPES
-export type ElementType = 'headline' | 'text' | 'image' | 'button' | 'spacer' | 'icon' | 'video' | 'form' | 'embed' | 'navigation' | 'gallery' | 'divider' | 'map' | 'accordion' | 'tabs' | 'socialIcons';
-
-export interface HeadlineElement extends StructureNode<'headline'> {
-  content: { text: string; level: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' };
-}
-export interface TextElement extends StructureNode<'text'> {
-  content: { text: string };
-}
-export interface ImageElement extends StructureNode<'image'> {
-  content: { src: string; alt: string };
-}
-export interface ButtonElement extends StructureNode<'button'> {
-  content: { text: string; href: string };
-}
-export interface SpacerElement extends StructureNode<'spacer'> {
-    content: {}; // No content
-}
-export interface IconElement extends StructureNode<'icon'> {
-    content: { name: string };
-}
-export interface VideoElement extends StructureNode<'video'> {
-    content: { 
-        src: string;
-        autoplay?: boolean;
-        loop?: boolean;
-        muted?: boolean;
-        controls?: boolean;
-    };
-}
-// NEW: Advanced Form Element
-export type FormFieldType = 'text' | 'email' | 'textarea' | 'checkbox' | 'select';
-export interface FormField {
+// WEBSITE STRUCTURE
+export interface WebsiteNode {
     id: string;
-    type: FormFieldType;
-    label: string;
-    placeholder?: string;
-    required?: boolean;
-    options?: string[]; // For select type
-}
-export interface FormElement extends StructureNode<'form'> {
-    content: { 
-        buttonText: string;
-        fields: FormField[];
-    };
-}
-export interface EmbedElement extends StructureNode<'embed'> {
-    content: { html: string };
-}
-export interface NavigationElement extends StructureNode<'navigation'> {
-    content: {}; // Content is generated from pages
-}
-export interface GalleryElement extends StructureNode<'gallery'> {
-    content: { images: { src: string; alt: string }[] };
-}
-export interface DividerElement extends StructureNode<'divider'> {
-    content: {}; // Styled via style panel
-}
-export interface MapElement extends StructureNode<'map'> {
-    content: { embedUrl: string };
+    type: string;
+    customName?: string;
+    styles: ResponsiveStyles;
+    hoverStyles?: ResponsiveStyles;
+    visibility?: { [key in Device]?: boolean };
+    animation?: 'none' | 'slideInUp' | 'fadeIn' | 'slideInLeft' | 'slideInRight' | 'scaleUp';
+    customCss?: string;
+    locked?: boolean;
+    children?: WebsiteNode[];
+    content?: any;
 }
 
-// NEW Elements
-export interface AccordionElement extends StructureNode<'accordion'> {
-    content: {
-        items: {
-            id: string;
-            title: string;
-            content: string;
-        }[];
-    };
-}
-export interface TabsElement extends StructureNode<'tabs'> {
-    content: {
-        items: {
-            id: string;
-            title: string;
-            content: Element[];
-        }[];
-    };
-}
-export interface SocialIconsElement extends StructureNode<'socialIcons'> {
-    content: {
-        networks: {
-            id: string;
-            network: 'facebook' | 'twitter' | 'instagram' | 'linkedin' | 'youtube';
-            url: string;
-        }[];
-    };
+export interface Section extends WebsiteNode {
+    type: 'section';
+    children: Row[];
 }
 
-
-export type Element = HeadlineElement | TextElement | ImageElement | ButtonElement | SpacerElement | IconElement | VideoElement | FormElement | EmbedElement | NavigationElement | GalleryElement | DividerElement | MapElement | AccordionElement | TabsElement | SocialIconsElement;
-
-// LAYOUT STRUCTURE TYPES
-export interface Column extends StructureNode<'column'> {
-  children: Element[];
-}
-export interface Row extends StructureNode<'row'> {
-  children: Column[];
-}
-export interface Section extends StructureNode<'section'> {
-  children: Row[];
+export interface Row extends WebsiteNode {
+    type: 'row';
+    children: Column[];
 }
 
-// Combined type for any node in the structure tree
-export type WebsiteNode = Section | Row | Column | Element;
+export interface Column extends WebsiteNode {
+    type: 'column';
+    children: Element[];
+}
 
-// Page Structure
+export interface Element extends WebsiteNode {
+    type: ElementType;
+    children?: undefined;
+}
+
+export type ElementType = 
+  | 'headline' | 'text' | 'image' | 'button' | 'spacer' | 'icon' | 'video' 
+  | 'form' | 'embed' | 'navigation' | 'gallery' | 'divider' | 'map' 
+  | 'accordion' | 'tabs' | 'socialIcons';
+
+
+// ELEMENT-SPECIFIC CONTENT TYPES
+export interface HeadlineElement extends Element { type: 'headline'; content: { level: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6'; text: string; }; }
+export interface TextElement extends Element { type: 'text'; content: { text: string; }; }
+export interface ImageElement extends Element { type: 'image'; content: { src: string; alt?: string; }; }
+export interface ButtonElement extends Element { type: 'button'; content: { text: string; href: string; }; }
+export interface SpacerElement extends Element { type: 'spacer'; content: {}; }
+export interface IconElement extends Element { type: 'icon'; content: { name: string; }; }
+export interface VideoElement extends Element { type: 'video', content: { src: string; autoplay?: boolean; loop?: boolean; muted?: boolean; controls?: boolean; } }
+export interface FormField { id: string; type: 'text' | 'email' | 'textarea' | 'checkbox' | 'select'; label: string; placeholder?: string; required?: boolean; options?: string[]; }
+export interface FormElement extends Element { type: 'form', content: { buttonText: string; fields: FormField[]; } }
+export interface EmbedElement extends Element { type: 'embed', content: { html: string; } }
+// FEAT: Navigation now uses a customizable list of links.
+export interface NavLink { id: string; text: string; type: 'internal' | 'external'; pageId?: string; href?: string; openInNewTab: boolean; }
+export interface NavigationElement extends Element { type: 'navigation'; content: { links: NavLink[] }; }
+export interface GalleryElement extends Element { type: 'gallery'; content: { images: { src: string; alt: string }[] } }
+export interface DividerElement extends Element { type: 'divider'; content: {} }
+export interface MapElement extends Element { type: 'map'; content: { embedUrl: string; } }
+export interface AccordionElement extends Element { type: 'accordion'; content: { items: { id: string; title: string; content: string; }[] } }
+export interface TabsElement extends Element { type: 'tabs'; content: { items: { id: string; title: string; content: WebsiteNode[] }[] } }
+export interface SocialIconsElement extends Element { type: 'socialIcons'; content: { networks: { id: string; network: 'facebook' | 'twitter' | 'instagram' | 'linkedin'; url: string }[] } }
+
 export interface Page {
-  id: string;
-  name: string;
-  slug: string;
-  isHomepage: boolean;
-  isDraft?: boolean; // To hide from published site
-  password?: string; // For password protection
-  heroImageUrl: string;
-  tagline: string;
-  metaTitle?: string;
-  metaDescription?: string;
-  ogImageUrl?: string; // Social sharing image
-  customHeadCode?: string; // Per-page custom code
-  customBodyCode?: string; // Per-page custom code (end of body)
-  children: Section[];
+    id: string;
+    name: string;
+    slug: string;
+    isHomepage?: boolean;
+    isDraft?: boolean;
+    // SEO & Page Specific settings
+    tagline?: string;
+    heroImageUrl?: string;
+    metaTitle?: string;
+    metaDescription?: string;
+    ogImageUrl?: string;
+    password?: string;
+    customHeadCode?: string;
+    customBodyCode?: string;
+    // Content
+    children: Section[];
 }
 
-// TOP-LEVEL WEBSITE DATA
 export interface WebsiteData {
-  id: string;
-  name: string;
-  theme: Theme;
-  faviconUrl?: string;
-  googleFont?: string;
-  customCursor?: string;
-  customHeadCode?: string; // Site-wide custom code
-  header: Section[]; // Global Header
-  footer: Section[]; // Global Footer
-  palette: {
-      primary: string;
-      secondary: string;
-      text: string;
-      accent: string;
-  };
-  globalStyles: {
-      colors: GlobalColor[];
-      typography: GlobalTypography[];
-  };
-  assets: { id: string, name: string, url: string }[];
-  pages: Page[];
-  // NEW: Fields for dashboard
-  lastUpdatedAt?: string;
-  tags?: string[];
-  // Mock data for UI demonstration
-  analytics?: {
-      views: number;
-      visitors: number;
-  };
-  seoScore?: number;
-  formSubmissions?: number;
+    id: string;
+    name: string;
+    theme: Theme;
+    faviconUrl?: string;
+    googleFont?: string;
+    customHeadCode?: string;
+    customCursor?: string;
+    header: Section[];
+    footer: Section[];
+    pages: Page[];
+    palette: {
+        primary: string;
+        secondary: string;
+        text: string;
+        accent: string;
+    };
+    assets: { id: string; name: string; url: string }[];
+    globalStyles: {
+        colors: GlobalColor[];
+        typography: GlobalTypography[];
+    };
+    // FEAT: Added metadata for dashboard.
+    lastUpdatedAt?: string;
+    createdAt?: string;
+    tags?: string[];
+    // Mocks for dashboard UI
+    analytics?: { views: number; visitors: number; };
+    seoScore?: number;
+    formSubmissions?: number;
 }
 
 
+// MISC
 export interface ThemeConfig {
   bg: string;
   text: string;
@@ -314,7 +235,7 @@ export interface ThemeConfig {
   headerText: string;
 }
 
-export interface Session {
+export type Session = {
     isAuthenticated: boolean;
     type: 'admin' | 'user' | null;
     username: string | null;

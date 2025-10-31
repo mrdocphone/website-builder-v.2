@@ -5,7 +5,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
 import type { WebsiteData, WebsiteNode, Section, Session, ElementType, Device, ResponsiveStyles, Element, Page, StyleProperties, Column } from '../types';
 // FIX: Added isDropAllowed to check drag-and-drop validity.
-import { findNodeById, updateNodeById, removeNodeById, addNode, moveNode, duplicateNodeById, findNodePath, deepCloneWithNewIds, addNodeNextTo, findNodeAndParent, isDropAllowed } from '../utils/tree';
+import { findNodeById, updateNodeById, removeNodeById, addNode, moveNode, duplicateNodeById, findNodePath, deepCloneWithNewIds, addNodeNextTo, findNodeAndParent, isDropAllowed, createDefaultElement } from '../utils/tree';
 import { generateSectionContent } from '../services/geminiService';
 import GlobalSettingsForm from './GlobalSettingsForm';
 import StylePanel from './SectionEditorForm';
@@ -13,7 +13,7 @@ import Preview from './Preview';
 import PublishModal from './PublishModal';
 import { DesktopIcon, TabletIcon, MobileIcon, LayersIcon, PlusIcon as ComponentIcon, SettingsIcon, PencilIcon, TrashIcon, VideoIcon, StarIcon, CheckIcon, HeartIcon, UndoIcon, RedoIcon, CopyIcon, PasteIcon, FormIcon, EmbedIcon, MagicWandIcon, HomeIcon, PageSettingsIcon, DuplicateIcon, ColumnIcon, LockIcon, UnlockIcon, LayoutIcon, SunIcon, MoonIcon, CommandIcon, AssetIcon, WireframeIcon, HistoryIcon, PlusIcon, AlignTopIcon, AlignCenterVerticalIcon, AlignBottomIcon, DistributeVerticalIcon } from './icons';
 import ContextMenu from './ContextMenu';
-import SectionTemplatesPanel from './SectionTemplatesPanel';
+import CommandPalette from './CommandPalette';
 import PageSettingsModal from './PageSettingsModal';
 import AssetManager from './AssetManager';
 import PagesAndLayersPanel from './PagesAndLayersPanel';
@@ -54,7 +54,7 @@ const useHistoryState = <T,>(initialState: T) => {
 
     const undo = () => { if (currentIndex > 0) setCurrentIndex(prev => prev - 1); };
     // FIX: Redo was incorrectly decrementing the index instead of incrementing it.
-    const redo = () => { if (currentIndex < history.length - 1) setCurrentIndex(prev => prev + 1); };
+    const redo = () => { if (currentIndex < history.length - 1) setCurrentIndex(prev => prev - 1); };
 
     return {
         state: history[currentIndex]?.state,
@@ -365,30 +365,49 @@ const Editor: React.FC<{session: Session}> = ({ session }) => {
     }, `Delete node`);
   }, [activePageId, editingContext, contentTree]);
 
+  // FEAT: Smarter element adding logic
   const handleAddElement = useCallback((type: ElementType) => {
-    if (selectedNodeIds.length !== 1) { alert("Please select a single column to add the element to."); return; }
-    
     updateWebsiteData(draft => {
-        let container: { children: WebsiteNode[] };
-        if (editingContext === 'page') {
-            const page = draft.pages.find(p => p.id === activePageId);
-            if (!page) return;
-            container = page;
-        } else {
-            container = { children: draft[editingContext] };
+        if (!draft) return;
+        const page = editingContext === 'page' ? draft.pages.find(p => p.id === activePageId) : null;
+        const container = editingContext === 'page' ? page : { children: draft[editingContext] };
+        if (!container) return;
+        
+        let targetColumnId: string | null = null;
+        let selectedNode: WebsiteNode | null = null;
+        if (selectedNodeIds.length > 0) {
+            selectedNode = findNodeById(container.children, selectedNodeIds[0]);
         }
 
-        const parentNode = findNodeById(container.children, selectedNodeIds[0]);
-        const targetParentId = (parentNode && parentNode.type === 'column') ? parentNode.id : null;
-        
-        if (targetParentId) {
-            addNode(container, targetParentId, type);
-            if (editingContext !== 'page') draft[editingContext] = container.children as Section[];
-        } else {
-            alert("Elements can only be added inside columns.");
+        if (selectedNode) {
+            if (selectedNode.type === 'column') {
+                targetColumnId = selectedNode.id;
+            } else if (selectedNode.type === 'row' || selectedNode.type === 'section') {
+                const firstColumn = (selectedNode as any).children?.[0];
+                if (firstColumn?.type === 'column') {
+                    targetColumnId = firstColumn.id;
+                }
+            }
         }
+        
+        // If still no target, create a new section
+        if (!targetColumnId) {
+            const newElement = createDefaultElement(type);
+            const newColumn: Column = { id: uuidv4(), type: 'column', styles: { desktop: {flexBasis: '100%'}, tablet: {}, mobile: {} }, children: [newElement] };
+            const newRow: WebsiteNode = { id: uuidv4(), type: 'row', styles: { desktop: {}, tablet: {}, mobile: {} }, children: [newColumn] };
+            const newSection: Section = { id: uuidv4(), type: 'section', styles: { desktop: { paddingTop: '2rem', paddingBottom: '2rem'}, tablet: {}, mobile: {} }, children: [newRow as any] };
+            
+            container.children.push(newSection);
+            setSelectedNodeIds([newElement.id]);
+        } else {
+            addNode(container, targetColumnId, type);
+        }
+        
+        if (editingContext !== 'page') draft[editingContext] = container.children as Section[];
     }, `Add ${type} element`);
+    setActiveTab('add');
   }, [selectedNodeIds, activePageId, editingContext]);
+  
   
   const handleAddSection = useCallback((context: 'page' | 'header' | 'footer') => {
       updateWebsiteData(draft => {
@@ -501,6 +520,34 @@ const Editor: React.FC<{session: Session}> = ({ session }) => {
       } catch (e) { alert(e instanceof Error ? e.message : 'An error occurred.'); } 
       finally { setIsAiLoading(false); }
   }
+  
+    const handleGenerateSection = async (sectionId: string) => {
+        if (!websiteData || !activePage) return;
+        const section = findNodeById(contentTree || [], sectionId) as Section;
+        if (!section) return;
+        setGeneratingSectionId(sectionId);
+        try {
+            const generatedColumns = await generateSectionContent(websiteData, activePage.tagline || '', section);
+            updateWebsiteData(draft => {
+                const tree = editingContext === 'page' ? draft.pages.find(p => p.id === activePageId)?.children : draft[editingContext];
+                const targetSection = findNodeById(tree || [], sectionId) as Section;
+                if (targetSection) {
+                    targetSection.children.forEach((row, rowIndex) => {
+                        row.children.forEach((column, colIndex) => {
+                            if (generatedColumns[colIndex]) {
+                                column.children = generatedColumns[colIndex].map(el => ({ ...createDefaultElement(el.type as ElementType), content: el.content }));
+                            }
+                        });
+                    });
+                }
+            }, 'AI Generate Section');
+        } catch (e) {
+            alert(e instanceof Error ? e.message : 'Failed to generate section content.');
+        } finally {
+            setGeneratingSectionId(null);
+        }
+    };
+
 
   // Drag & Drop Handlers
   const handleDragStart = (e: React.DragEvent, nodeId: string) => { e.dataTransfer.effectAllowed = 'move'; setDraggedNodeId(nodeId); };
@@ -571,6 +618,20 @@ const Editor: React.FC<{session: Session}> = ({ session }) => {
     }
     setActiveTab(tab);
   }
+  
+    const commandPaletteCommands = [
+        ...['headline', 'text', 'button', 'image', 'spacer', 'video', 'icon', 'form'].map(type => ({
+            id: `add-${type}`,
+            label: `Add ${type.charAt(0).toUpperCase() + type.slice(1)} Element`,
+            action: () => handleAddElement(type as ElementType),
+            icon: PlusIcon
+        })),
+        { id: 'add-section', label: 'Add New Section', action: () => handleAddSection('page'), icon: PlusIcon },
+        { id: 'create-page', label: 'Create New Page', action: handleCreatePage, icon: PageSettingsIcon },
+        { id: 'publish', label: 'Publish Site', action: () => setIsPublishModalOpen(true), icon: CheckIcon },
+        { id: 'toggle-wireframe', label: `Toggle Wireframe Mode`, action: () => setViewMode(v => v === 'normal' ? 'wireframe' : 'normal'), icon: WireframeIcon },
+    ];
+
 
   if (!websiteData || !activePage) return <div className="editor-container items-center justify-center"><div className="dashboard-spinner"></div></div>;
   if (error) return <div className="p-4 text-red-600">{error}</div>;
@@ -624,7 +685,7 @@ const Editor: React.FC<{session: Session}> = ({ session }) => {
                 </div>
              )}
             <div className={`preview-canvas preview-canvas-${device}`}>
-                <Preview websiteData={websiteData} activePage={activePage} interactive device={device} selectedNodeId={selectedNodeIds[0]} selectedNodeIds={selectedNodeIds} hoveredNodeId={hoveredNodeId} onSelectNode={handleSelectNode} onHoverNode={setHoveredNodeId} onUpdateNode={handleUpdateNode} onAiTextUpdate={handleAiTextUpdate} isAiLoading={isAiLoading} onContextMenuRequest={handleContextMenuRequest} onAddSection={handleAddSection}/>
+                <Preview websiteData={websiteData} activePage={activePage} interactive device={device} selectedNodeId={selectedNodeIds[0]} selectedNodeIds={selectedNodeIds} hoveredNodeId={hoveredNodeId} onSelectNode={handleSelectNode} onHoverNode={setHoveredNodeId} onUpdateNode={handleUpdateNode} onAiTextUpdate={handleAiTextUpdate} isAiLoading={isAiLoading} onContextMenuRequest={handleContextMenuRequest} onAddSection={handleAddSection} onGenerateSection={handleGenerateSection} generatingSectionId={generatingSectionId} />
             </div>
         </main>
       </div>
@@ -632,6 +693,7 @@ const Editor: React.FC<{session: Session}> = ({ session }) => {
       {editingPage && <PageSettingsModal page={editingPage} onClose={() => setEditingPage(null)} onSave={(updates) => updateWebsiteData(draft => { const p = draft.pages.find(p => p.id === editingPage.id); if (p) Object.assign(p, updates); }, 'Update page settings')} />}
        {isAssetManagerOpen && <AssetManager websiteData={websiteData} onClose={() => setIsAssetManagerOpen(false)} onUpdateAssets={(newAssets) => updateWebsiteData(draft => { draft.assets = newAssets; }, 'Update Assets')} onSelectAsset={(url) => { if (selectedNode) { handleUpdateNode(selectedNode.id, { styles: { desktop: { backgroundImage: `url(${url})` }, tablet: {}, mobile: {}}}); setIsAssetManagerOpen(false); } }} />}
       {contextMenu && <ContextMenu x={contextMenu.x} y={contextMenu.y} nodeId={contextMenu.nodeId} onClose={handleCloseContextMenu} onDuplicate={() => handleDuplicateNode(contextMenu.nodeId)} onDelete={() => handleDeleteNode(contextMenu.nodeId)} onCopyStyles={() => handleCopyStyles(contextMenu.nodeId)} onPasteStyles={() => handlePasteStyles(contextMenu.nodeId)} onCopyNode={() => handleCopyNode(contextMenu.nodeId)} onPasteNode={() => handlePasteNode(contextMenu.nodeId)} onToggleLock={() => handleToggleLock(contextMenu.nodeId)} canPasteStyles={!!copiedStyles} canPasteNode={!!copiedNode} node={findNodeById(contentTree || [], contextMenu.nodeId)} />}
+      <CommandPalette isOpen={isCommandPaletteOpen} onClose={() => setIsCommandPaletteOpen(false)} commands={commandPaletteCommands} />
     </div>
   );
 };

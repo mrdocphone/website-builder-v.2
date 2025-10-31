@@ -1,5 +1,3 @@
-
-
 import React from 'react';
 import type { WebsiteNode, Device } from '../types';
 import { 
@@ -21,7 +19,7 @@ import {
     AccordionIcon,
     TabsIcon,
     SocialIcon,
-    PlusIcon // Placeholder for expander
+    ChevronRightIcon
 } from './icons';
 
 
@@ -124,11 +122,13 @@ const LayerItem: React.FC<LayerItemProps> = (props) => {
             {showDropIndicatorTop && <div className="drop-indicator-top"></div>}
             <div className={`layer-item ${isSelected ? 'selected' : ''}`} onClick={(e) => onSelectNode(node.id, e)}>
                 <div className="layer-item-content">
-                     {hasChildren ? (
-                        <button onClick={(e) => { e.stopPropagation(); onToggleCollapse(node.id); }} className={`layer-item-expander ${!isCollapsed ? 'expanded' : ''}`}>
-                            &#9656;
-                        </button>
-                    ) : <div className="w-4 h-4" /> }
+                     <div className="w-4 h-4 flex items-center justify-center">
+                        {hasChildren && (
+                            <button onClick={(e) => { e.stopPropagation(); onToggleCollapse(node.id); }} className={`layer-item-expander p-0.5 rounded hover:bg-slate-200 ${!isCollapsed ? 'expanded' : ''}`}>
+                                <ChevronRightIcon className="w-3.5 h-3.5" />
+                            </button>
+                        )}
+                    </div>
                     <NodeIcon className="layer-item-icon" />
                     {isRenaming ? (
                         <input

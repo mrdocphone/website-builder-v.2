@@ -261,6 +261,11 @@
       .quick-add-button-wrapper:hover .quick-add-button { display: block; }
       .quick-add-button button { background-color: var(--accent-color); color: white; border-radius: 9999px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1); border: 2px solid white; transition: transform 0.2s; }
       .quick-add-button button:hover { transform: scale(1.1); }
+
+      /* NEW: AI Generate Button & Overlay */
+      .ai-section-button { position: absolute; top: 8px; right: 8px; z-index: 20; display: none; }
+      .interactive-wrapper.selected.section-selected .ai-section-button { display: flex; }
+      .ai-generating-overlay { position: absolute; inset: 0; background-color: rgba(203, 213, 225, 0.6); display: flex; align-items: center; justify-content: center; z-index: 20; backdrop-filter: blur(2px); transition: opacity 0.3s; }
       
       /* Rich Text Toolbar */
       .rich-text-toolbar { position: absolute; top: -42px; left: 50%; transform: translateX(-50%); z-index: 20; display: flex; align-items: center; background-color: #1e293b; border-radius: 6px; padding: 4px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1); gap: 2px; }

@@ -1,7 +1,7 @@
 
-import React, { useState, useRef } from 'react';
-import type { WebsiteNode, Device, StyleProperties, Element, IconElement, WebsiteData, FormElement, EmbedElement, GalleryElement, SocialIconsElement, FormField, VideoElement, AccordionElement, TabsElement, Row, Column } from '../types';
-import { availableIcons, IconRenderer, DesktopIcon, TabletIcon, MobileIcon, EyeIcon, EyeSlashIcon, PlusIcon, TrashIcon, DragHandleIcon, PencilIcon, GridIcon, AnimationIcon, CheckboxIcon, SelectIcon, TextColorIcon, LayoutIcon } from './icons';
+import React, { useState, useRef, useEffect } from 'react';
+import type { WebsiteNode, Device, StyleProperties, Element, IconElement, WebsiteData, FormElement, EmbedElement, GalleryElement, SocialIconsElement, FormField, VideoElement, AccordionElement, TabsElement, Row, Column, NavigationElement, NavLink, Page } from '../types';
+import { availableIcons, IconRenderer, DesktopIcon, TabletIcon, MobileIcon, EyeIcon, EyeSlashIcon, PlusIcon, TrashIcon, DragHandleIcon, PencilIcon, GridIcon, AnimationIcon, CheckboxIcon, SelectIcon, TextColorIcon, LayoutIcon, XIcon, ChainLinkIcon, UnlinkIcon } from './icons';
 import { v4 as uuidv4 } from 'uuid';
 
 interface StylePanelProps {
@@ -11,6 +11,7 @@ interface StylePanelProps {
   onUpdate: (id: string, updates: Partial<WebsiteNode>) => void;
   onOpenAssetManager: () => void;
   onSelectNode: (id: string) => void;
+  device: Device;
 }
 
 const ColorPicker: React.FC<{ label: string, value: string | undefined, onChange: (value: string) => void, globalColors: WebsiteData['globalStyles']['colors'] }> = ({ label, value, onChange, globalColors }) => {
@@ -18,13 +19,35 @@ const ColorPicker: React.FC<{ label: string, value: string | undefined, onChange
     const isGlobal = !!varName;
     const globalColor = globalColors.find(c => c.name.toLowerCase().replace(/\s+/g, '-') === varName);
     
+    // FIX: Synchronize text and color inputs with local state for better UX.
+    const [textValue, setTextValue] = useState(value || '');
+    useEffect(() => { setTextValue(value || ''); }, [value]);
+
+    const handleColorInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const newColor = e.target.value;
+        setTextValue(newColor);
+        onChange(newColor);
+    };
+    
+    const handleTextInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setTextValue(e.target.value);
+    };
+
+    const handleTextInputBlur = () => {
+        onChange(textValue);
+    };
+
     return (
         <div className="mb-2">
             <div className="flex items-center justify-between">
                 <label className="text-sm text-slate-500 block">{label}</label>
                 <div className="flex items-center gap-2 border rounded-md p-1">
-                    <input type="color" value={isGlobal ? globalColor?.value : value || '#000000'} onChange={e => onChange(e.target.value)} className="w-6 h-6 p-0 border-none bg-transparent" />
-                    <input type="text" value={value || ''} onChange={e => onChange(e.target.value)} className="w-24 border-none text-sm p-0 focus:ring-0" placeholder="#000000"/>
+                    <input type="color" value={isGlobal ? globalColor?.value : value || '#000000'} onChange={handleColorInputChange} className="w-6 h-6 p-0 border-none bg-transparent cursor-pointer" />
+                    <input type="text" value={textValue} onChange={handleTextInputChange} onBlur={handleTextInputBlur} className="w-24 border-none text-sm p-0 focus:ring-0" placeholder="transparent"/>
+                    {/* FEAT: Add a clear button to easily remove the color. */}
+                    {value && <button onClick={() => onChange('')} className="p-0.5 text-slate-400 hover:text-slate-600" title="Clear color">
+                        <XIcon className="w-4 h-4" />
+                    </button>}
                 </div>
             </div>
             {globalColors.length > 0 && <div className="global-color-swatches">
@@ -94,35 +117,65 @@ const StyleInput: React.FC<{
     step?: number;
 }> = ({ label, value, onChange, type = 'text', options, isInherited = false, placeholder, ...props }) => (
     <div className="flex items-center justify-between mb-2">
-        <label className="text-sm text-slate-500 block flex items-center">
-             {isInherited && <span className="w-1.5 h-1.5 bg-blue-400 rounded-full mr-2" title="Inherited value"></span>}
+        <label className={`text-sm text-slate-500 block flex items-center ${isInherited ? 'style-input-label-inherited' : ''}`} title={isInherited ? 'Value inherited from a larger screen size' : ''}>
             {label}
         </label>
         {type === 'select' ? (
             <select value={value || ''} onChange={e => onChange(e.target.value)} className="w-1/2 p-1 border rounded text-sm bg-white">
                 {options?.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
             </select>
+        ) : type === 'range' ? (
+            // FIX: Add a numeric display for range inputs for better UX.
+            <div className="w-1/2 flex items-center gap-2">
+                <input type={type} value={value || ''} onChange={e => onChange(e.target.value)} className="w-full" {...props} />
+                <span className="text-xs text-slate-500 w-8 text-right">{value}</span>
+            </div>
         ) : (
             <input type={type} value={value || ''} onChange={e => onChange(e.target.value)} placeholder={placeholder} className={`w-1/2 p-1 border rounded text-sm ${type === 'color' ? 'h-8' : ''}`} {...props} />
         )}
     </div>
 );
 
-const FourSidedControl: React.FC<{ label: string, values: Record<string, string|undefined>, onChange: (side: string, value: string) => void }> = ({ label, values, onChange }) => (
-    <div>
-        <label className="text-sm text-slate-500 block mb-1">{label}</label>
-        <div className="four-sided-control">
-            <input type="text" value={values.Top || ''} onChange={e => onChange('Top', e.target.value)} placeholder="Top" />
-            <span></span>
-            <input type="text" value={values.Bottom || ''} onChange={e => onChange('Bottom', e.target.value)} placeholder="Bottom" />
+// FEAT: Upgraded FourSidedControl with state to "link" all four values together for faster editing.
+const FourSidedControl: React.FC<{ label: string, values: Record<string, string|undefined>, onChange: (side: string, value: string) => void }> = ({ label, values, onChange }) => {
+    const [isLinked, setIsLinked] = useState(true);
+
+    const handleSideChange = (side: string, newValue: string) => {
+        if (isLinked) {
+            onChange('Top', newValue);
+            onChange('Bottom', newValue);
+            onChange('Left', newValue);
+            onChange('Right', newValue);
+        } else {
+            onChange(side, newValue);
+        }
+    };
+
+    return (
+        <div>
+            <div className="flex justify-between items-center mb-1">
+                <label className="text-sm text-slate-500 block">{label}</label>
+                <button onClick={() => setIsLinked(!isLinked)} title={isLinked ? "Unlink sides" : "Link sides"} className="p-1 text-slate-400 hover:text-slate-600">
+                    {isLinked ? <ChainLinkIcon className="w-4 h-4" /> : <UnlinkIcon className="w-4 h-4" />}
+                </button>
+            </div>
+            {isLinked ? (
+                <input type="text" value={values.Top || values.Bottom || values.Left || values.Right || ''} onChange={e => handleSideChange('Top', e.target.value)} placeholder="All sides" className="w-full p-1 border rounded text-sm"/>
+            ) : (
+                 <>
+                    <div className="grid grid-cols-2 gap-2">
+                        <input type="text" value={values.Top || ''} onChange={e => handleSideChange('Top', e.target.value)} placeholder="Top" className="w-full p-1 border rounded text-sm"/>
+                        <input type="text" value={values.Bottom || ''} onChange={e => handleSideChange('Bottom', e.target.value)} placeholder="Bottom" className="w-full p-1 border rounded text-sm"/>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 mt-1">
+                        <input type="text" value={values.Left || ''} onChange={e => handleSideChange('Left', e.target.value)} placeholder="Left" className="w-full p-1 border rounded text-sm"/>
+                        <input type="text" value={values.Right || ''} onChange={e => handleSideChange('Right', e.target.value)} placeholder="Right" className="w-full p-1 border rounded text-sm"/>
+                    </div>
+                </>
+            )}
         </div>
-        <div className="four-sided-control my-1">
-            <input type="text" value={values.Left || ''} onChange={e => onChange('Left', e.target.value)} placeholder="Left" />
-            <span className="text-xs text-center text-slate-400">{label.charAt(0)}</span>
-            <input type="text" value={values.Right || ''} onChange={e => onChange('Right', e.target.value)} placeholder="Right" />
-        </div>
-    </div>
-);
+    )
+};
 
 
 const Accordion: React.FC<React.PropsWithChildren<{title: string, icon?: React.FC<any>}>> = ({ title, icon: Icon, children }) => {
@@ -138,9 +191,13 @@ const Accordion: React.FC<React.PropsWithChildren<{title: string, icon?: React.F
     )
 }
 
-const StylePanel: React.FC<StylePanelProps> = ({ node, nodePath, websiteData, onUpdate, onOpenAssetManager, onSelectNode }) => {
-    const [editingDevice, setEditingDevice] = useState<Device>('desktop');
+const StylePanel: React.FC<StylePanelProps> = ({ node, nodePath, websiteData, onUpdate, onOpenAssetManager, onSelectNode, device }) => {
+    const [editingDevice, setEditingDevice] = useState<Device>(device);
     const [editState, setEditState] = useState<'normal' | 'hover'>('normal');
+    
+    useEffect(() => {
+        setEditingDevice(device);
+    }, [device]);
     
     const draggedField = useRef<number | null>(null);
     const [dragOverField, setDragOverField] = useState<number | null>(null);
@@ -166,10 +223,11 @@ const StylePanel: React.FC<StylePanelProps> = ({ node, nodePath, websiteData, on
         const oldColumns = row.children;
         const newColumnCount = layout.length;
         const oldColumnCount = oldColumns.length;
+        const totalFlex = layout.reduce((a, b) => a + b, 0);
 
         const newColumns: Column[] = layout.map((flexValue, i) => {
             const existingCol = oldColumns[i];
-            const basis = `${(flexValue / layout.reduce((a, b) => a + b, 0)) * 100}%`;
+            const basis = `${(flexValue / totalFlex) * 100}%`;
             if (existingCol) {
                 const newStyles = { ...existingCol.styles };
                 if (!newStyles.desktop) newStyles.desktop = {};
@@ -179,21 +237,61 @@ const StylePanel: React.FC<StylePanelProps> = ({ node, nodePath, websiteData, on
             return { id: uuidv4(), type: 'column', styles: { desktop: { flexBasis: basis }, tablet: {}, mobile: {} }, children: [] };
         });
 
-        // If reducing column count, move children from removed columns to the last new column
+        // FIX: Critical data loss bug. Content from removed columns is now safely appended to the last remaining column.
         if (newColumnCount < oldColumnCount) {
             const childrenToMove = oldColumns.slice(newColumnCount).flatMap(col => col.children);
-            newColumns[newColumns.length - 1].children.push(...childrenToMove);
+            if (newColumns.length > 0) {
+              newColumns[newColumns.length - 1].children.push(...childrenToMove);
+            }
         }
 
         onUpdate(node.id, { children: newColumns });
     };
+
+    // FIX: This function correctly determines if a style is being inherited from a larger viewport.
+    const getInheritedStatus = (prop: keyof StyleProperties): boolean => {
+        const styles = node.styles;
+        if (!styles) return false;
+
+        if (editingDevice === 'desktop') {
+            return false;
+        }
+        if (editingDevice === 'tablet') {
+            const hasOwn = styles.tablet && prop in styles.tablet && styles.tablet[prop] !== undefined;
+            const inherited = styles.desktop && prop in styles.desktop && styles.desktop[prop] !== undefined;
+            return !hasOwn && inherited;
+        }
+        if (editingDevice === 'mobile') {
+            const hasOwn = styles.mobile && prop in styles.mobile && styles.mobile[prop] !== undefined;
+            const inheritedFromTablet = styles.tablet && prop in styles.tablet && styles.tablet[prop] !== undefined;
+            const inheritedFromDesktop = styles.desktop && prop in styles.desktop && styles.desktop[prop] !== undefined;
+            return !hasOwn && (inheritedFromTablet || inheritedFromDesktop);
+        }
+        return false;
+    };
+    
+    // FIX: This function stringifies a layout to uniquely identify it for highlighting the active selection.
+    const stringifyLayout = (layout: number[]): string => {
+        const total = layout.reduce((a, b) => a + b, 0);
+        return JSON.stringify(layout.map(l => Math.round((l / total) * 100)));
+    };
+
+    const getCurrentLayoutString = (columns: Column[]): string => {
+        if (!columns || columns.length === 0) return '';
+        const percentages = columns.map(c => Math.round(parseFloat(c.styles.desktop?.flexBasis || '0')));
+        const total = percentages.reduce((a, b) => a + b, 0);
+        // Allow for minor floating point inaccuracies
+        return (total > 98 && total < 102) ? JSON.stringify(percentages) : '';
+    };
+    
+    const currentLayoutStr = node.type === 'row' ? getCurrentLayoutString((node as Row).children) : '';
 
     const currentStylesForEditing = (editState === 'normal' ? node.styles : node.hoverStyles)?.[editingDevice] || {};
     const content = (node as any).content || {};
     const deviceOptions: { id: Device; icon: React.FC<any> }[] = [ { id: 'desktop', icon: DesktopIcon }, { id: 'tablet', icon: TabletIcon }, { id: 'mobile', icon: MobileIcon }, ];
     const isContainer = ['section', 'row', 'column'].includes(node.type);
     
-    const layouts = [[1], [1, 1], [1, 2], [2, 1], [1, 1, 1], [1, 1, 2]];
+    const layouts = [ [1], [1, 1], [1, 2], [2, 1], [1, 1, 1], [1, 2, 1], [3, 1], [1, 3], [1, 1, 1, 1]];
 
     const renderContentFields = () => {
         switch (node.type) {
@@ -213,6 +311,35 @@ const StylePanel: React.FC<StylePanelProps> = ({ node, nodePath, websiteData, on
                     {!isIconValid && <p className="text-sm text-red-600 mb-2">Warning: Saved icon not found. Please select a new one.</p>}
                     <div className="grid grid-cols-4 gap-2">{Object.keys(availableIcons).map(iconName => (<button key={iconName} onClick={() => handleContentChange('name', iconName)} className={`p-2 rounded border-2 flex justify-center items-center ${content.name === iconName ? 'border-indigo-500 bg-indigo-50' : ''}`}><IconRenderer iconName={iconName} className="w-6 h-6" /></button>))}</div>
                 </>);
+            }
+            case 'navigation': {
+                const links: NavLink[] = (node as NavigationElement).content.links || [];
+                const handleUpdateLinks = (newLinks: NavLink[]) => handleContentChange('links', newLinks);
+                const handleAddLink = () => handleUpdateLinks([...links, { id: uuidv4(), text: 'New Link', type: 'internal', pageId: websiteData.pages[0]?.id, openInNewTab: false }]);
+                const handleRemoveLink = (index: number) => handleUpdateLinks(links.filter((_, i) => i !== index));
+                const handleLinkChange = (index: number, field: keyof NavLink, value: any) => handleUpdateLinks(links.map((l, i) => i === index ? { ...l, [field]: value } : l));
+                
+                return (
+                    <div className="space-y-2">
+                        {links.map((link, index) => (
+                            <div key={link.id} className="p-3 border rounded bg-white space-y-2">
+                                <div className="flex justify-between items-center">
+                                    <span className="font-medium text-sm">Link {index + 1}</span>
+                                    <button onClick={() => handleRemoveLink(index)} className="p-1 hover:bg-red-50 rounded"><TrashIcon className="w-4 h-4 text-red-500"/></button>
+                                </div>
+                                <StyleInput label="Text" value={link.text} onChange={val => handleLinkChange(index, 'text', val)} />
+                                <StyleInput label="Type" value={link.type} onChange={val => handleLinkChange(index, 'type', val)} type="select" options={[{value:'internal', label:'Internal Page'}, {value:'external', label:'External URL'}]} />
+                                {link.type === 'internal' ? (
+                                    <StyleInput label="Page" value={link.pageId} onChange={val => handleLinkChange(index, 'pageId', val)} type="select" options={websiteData.pages.map(p => ({ value: p.id, label: p.name }))} />
+                                ) : (
+                                    <StyleInput label="URL" value={link.href} onChange={val => handleLinkChange(index, 'href', val)} />
+                                )}
+                                <label className="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" checked={!!link.openInNewTab} onChange={e => handleLinkChange(index, 'openInNewTab', e.target.checked)} /> Open in new tab</label>
+                            </div>
+                        ))}
+                        <button onClick={handleAddLink} className="mt-2 text-indigo-600 text-sm font-semibold flex items-center gap-1"><PlusIcon className="w-4 h-4"/> Add Link</button>
+                    </div>
+                )
             }
             case 'accordion': {
                 const items = (node as AccordionElement).content.items || [];
@@ -246,9 +373,9 @@ const StylePanel: React.FC<StylePanelProps> = ({ node, nodePath, websiteData, on
                      <h4 className="font-semibold text-sm mb-2">Form Fields</h4>
                     <div onDrop={handleDrop} onDragLeave={() => setDragOverField(null)}>
                     {fields.map((field, index) => (
-                        <div key={field.id} draggable onDragStart={e => handleDragStart(e, index)} onDragOver={e => handleDragOver(e, index)} className={`p-3 border rounded mb-2 bg-white space-y-2 relative ${draggedField.current === index ? 'opacity-50' : ''}`}>
+                        <div key={field.id} draggable onDragStart={e => handleDragStart(e, index)} onDragOver={e => handleDragOver(e, index)} className={`p-3 border rounded mb-2 bg-white space-y-2 relative cursor-move ${draggedField.current === index ? 'opacity-50' : ''}`}>
                             {dragOverField === index && <div className="absolute inset-x-0 top-0 h-1 bg-indigo-400"></div>}
-                            <div className="flex justify-between items-center"><span className="font-medium text-sm">Field {index + 1}</span><button onClick={() => handleRemoveField(index)} className="p-1 hover:bg-red-50 rounded"><TrashIcon className="w-4 h-4 text-red-500"/></button></div>
+                            <div className="flex justify-between items-center"><span className="font-medium text-sm flex items-center gap-2"><DragHandleIcon className="w-4 h-4 text-slate-400" /> Field {index + 1}</span><button onClick={() => handleRemoveField(index)} className="p-1 hover:bg-red-50 rounded"><TrashIcon className="w-4 h-4 text-red-500"/></button></div>
                             <StyleInput label="Type" value={field.type} onChange={val => handleFieldChange(index, { type: val })} type="select" options={[{value:'text',label:'Text'},{value:'email',label:'Email'},{value:'textarea',label:'Text Area'},{value:'checkbox',label:'Checkbox'},{value:'select',label:'Select'}]}/>
                             <StyleInput label="Label" value={field.label} onChange={val => handleFieldChange(index, { label: val })} /><StyleInput label="Placeholder" value={field.placeholder} onChange={val => handleFieldChange(index, { placeholder: val })} />
                             {field.type === 'select' && ( <div> <label className="text-sm text-slate-500 block mb-1">Options</label> <input type="text" value={field.options?.join(', ') || ''} onChange={e => handleFieldChange(index, { options: e.target.value.split(',').map(s => s.trim())})} placeholder="Option 1, Option 2" className="w-full p-1 border rounded text-sm"/> </div> )}
@@ -280,24 +407,24 @@ const StylePanel: React.FC<StylePanelProps> = ({ node, nodePath, websiteData, on
                 {node.type === 'row' && <Accordion title="Layout" icon={LayoutIcon}>
                     <div className="layout-picker">
                         {layouts.map((layout, i) => (
-                            <button key={i} onClick={() => handleLayoutChange(layout)} className={`layout-option`}>
+                            <button key={i} onClick={() => handleLayoutChange(layout)} className={`layout-option ${currentLayoutStr === stringifyLayout(layout) ? 'selected' : ''}`}>
                                 {layout.map((flex, j) => <div key={j} className="col" style={{flexGrow: flex}}></div>)}
                             </button>
                         ))}
                     </div>
                 </Accordion>}
                 {isContainer && <Accordion title="Layout" icon={LayoutIcon}>
-                    <StyleInput label="Display" value={currentStylesForEditing.display} onChange={val => handleStyleChange('display', val)} type="select" options={[{value: 'flex', label: 'Flex'}, {value: 'grid', label: 'Grid'}, {value: 'block', label: 'Block'}]} />
+                    <StyleInput label="Display" value={currentStylesForEditing.display} onChange={val => handleStyleChange('display', val)} type="select" options={[{value: 'flex', label: 'Flex'}, {value: 'grid', label: 'Grid'}, {value: 'block', label: 'Block'}]} isInherited={getInheritedStatus('display')} />
                     {currentStylesForEditing.display === 'flex' && <>
-                        <StyleInput label="Direction" value={currentStylesForEditing.flexDirection} onChange={val => handleStyleChange('flexDirection', val)} type="select" options={[{value: 'row', label: 'Row'}, {value: 'column', label: 'Column'}]} />
-                        <StyleInput label="Justify" value={currentStylesForEditing.justifyContent} onChange={val => handleStyleChange('justifyContent', val)} type="select" options={[{value: 'flex-start', label: 'Start'}, {value: 'center', label: 'Center'}, {value: 'flex-end', label: 'End'}, {value: 'space-between', label: 'Space Between'}]} />
-                        <StyleInput label="Align" value={currentStylesForEditing.alignItems} onChange={val => handleStyleChange('alignItems', val)} type="select" options={[{value: 'flex-start', label: 'Start'}, {value: 'center', label: 'Center'}, {value: 'flex-end', label: 'End'}, {value: 'stretch', label: 'Stretch'}]} />
+                        <StyleInput label="Direction" value={currentStylesForEditing.flexDirection} onChange={val => handleStyleChange('flexDirection', val)} type="select" options={[{value: 'row', label: 'Row'}, {value: 'column', label: 'Column'}]} isInherited={getInheritedStatus('flexDirection')}/>
+                        <StyleInput label="Justify" value={currentStylesForEditing.justifyContent} onChange={val => handleStyleChange('justifyContent', val)} type="select" options={[{value: 'flex-start', label: 'Start'}, {value: 'center', label: 'Center'}, {value: 'flex-end', label: 'End'}, {value: 'space-between', label: 'Space Between'}]} isInherited={getInheritedStatus('justifyContent')}/>
+                        <StyleInput label="Align" value={currentStylesForEditing.alignItems} onChange={val => handleStyleChange('alignItems', val)} type="select" options={[{value: 'flex-start', label: 'Start'}, {value: 'center', label: 'Center'}, {value: 'flex-end', label: 'End'}, {value: 'stretch', label: 'Stretch'}]} isInherited={getInheritedStatus('alignItems')}/>
                     </>}
                     {currentStylesForEditing.display === 'grid' && <>
-                        <StyleInput label="Columns" value={currentStylesForEditing.gridTemplateColumns} onChange={val => handleStyleChange('gridTemplateColumns', val)} placeholder="e.g. 1fr 1fr" />
-                        <StyleInput label="Rows" value={currentStylesForEditing.gridTemplateRows} onChange={val => handleStyleChange('gridTemplateRows', val)} placeholder="e.g. auto 1fr" />
+                        <StyleInput label="Columns" value={currentStylesForEditing.gridTemplateColumns} onChange={val => handleStyleChange('gridTemplateColumns', val)} placeholder="e.g. 1fr 1fr" isInherited={getInheritedStatus('gridTemplateColumns')}/>
+                        <StyleInput label="Rows" value={currentStylesForEditing.gridTemplateRows} onChange={val => handleStyleChange('gridTemplateRows', val)} placeholder="e.g. auto 1fr" isInherited={getInheritedStatus('gridTemplateRows')}/>
                     </>}
-                    <StyleInput label="Gap" value={currentStylesForEditing.gap} onChange={val => handleStyleChange('gap', val)} />
+                    <StyleInput label="Gap" value={currentStylesForEditing.gap} onChange={val => handleStyleChange('gap', val)} isInherited={getInheritedStatus('gap')}/>
                 </Accordion>}
                  <Accordion title="Typography">
                     <ColorPicker label="Text Color" value={currentStylesForEditing.color} onChange={v => handleStyleChange('color', v)} globalColors={websiteData.globalStyles.colors} />
@@ -315,11 +442,11 @@ const StylePanel: React.FC<StylePanelProps> = ({ node, nodePath, websiteData, on
                      <FourSidedControl label="Padding" values={{Top: currentStylesForEditing.paddingTop, Bottom: currentStylesForEditing.paddingBottom, Left: currentStylesForEditing.paddingLeft, Right: currentStylesForEditing.paddingRight}} onChange={(s,v) => handleStyleChange(`padding${s}` as any, v)}/>
                  </Accordion>
                  <Accordion title="Sizing">
-                    <StyleInput label="Width" value={currentStylesForEditing.width} onChange={v => handleStyleChange('width', v)} />
-                    <StyleInput label="Height" value={currentStylesForEditing.height} onChange={v => handleStyleChange('height', v)} />
+                    <StyleInput label="Width" value={currentStylesForEditing.width} onChange={v => handleStyleChange('width', v)} isInherited={getInheritedStatus('width')}/>
+                    <StyleInput label="Height" value={currentStylesForEditing.height} onChange={v => handleStyleChange('height', v)} isInherited={getInheritedStatus('height')}/>
                      {node.type === 'image' && <>
-                        <StyleInput label="Object Fit" value={currentStylesForEditing.objectFit} onChange={v => handleStyleChange('objectFit', v)} type="select" options={[{value: 'cover', label: 'Cover'}, {value: 'contain', label: 'Contain'}, {value: 'fill', label: 'Fill'}]} />
-                        <StyleInput label="Aspect Ratio" value={currentStylesForEditing.aspectRatio} onChange={v => handleStyleChange('aspectRatio', v)} placeholder="e.g. 16 / 9"/>
+                        <StyleInput label="Object Fit" value={currentStylesForEditing.objectFit} onChange={v => handleStyleChange('objectFit', v)} type="select" options={[{value: 'cover', label: 'Cover'}, {value: 'contain', label: 'Contain'}, {value: 'fill', label: 'Fill'}]} isInherited={getInheritedStatus('objectFit')}/>
+                        <StyleInput label="Aspect Ratio" value={currentStylesForEditing.aspectRatio} onChange={v => handleStyleChange('aspectRatio', v)} placeholder="e.g. 16 / 9" isInherited={getInheritedStatus('aspectRatio')}/>
                     </>}
                  </Accordion>
                  <Accordion title="Position">

@@ -35,12 +35,13 @@ const RichTextToolbar: React.FC = () => {
     // Auto-open link editor if cursor is inside a link
     if (parentLink) {
         setLinkUrl(parentLink.getAttribute('href') || '');
-        setIsLinkEditorOpen(true);
-    } else {
+        // Don't auto-open if it was manually closed
+        // setIsLinkEditorOpen(true);
+    } else if (!isLinkEditorOpen) {
         setIsLinkEditorOpen(false);
     }
 
-  }, []);
+  }, [isLinkEditorOpen]);
 
   useEffect(() => {
     const handleSelectionChange = () => {
@@ -74,7 +75,9 @@ const RichTextToolbar: React.FC = () => {
     }
   }
 
+  // FIX: Restore selection before executing command to prevent formatting errors.
   const applyFormat = (format: string, value?: string) => {
+    restoreSelection();
     document.execCommand(format, false, value);
     updateActiveFormats();
     document.activeElement instanceof HTMLElement && document.activeElement.focus();
@@ -96,6 +99,10 @@ const RichTextToolbar: React.FC = () => {
 
   const toggleLink = () => {
     saveSelection();
+    const parentLink = getParentLink(window.getSelection());
+    if (parentLink) {
+        setLinkUrl(parentLink.getAttribute('href') || '');
+    }
     setIsLinkEditorOpen(!isLinkEditorOpen);
     setTimeout(() => linkInputRef.current?.focus(), 0);
   }
@@ -135,12 +142,12 @@ const RichTextToolbar: React.FC = () => {
 
   return (
     <div className="rich-text-toolbar" onMouseDown={(e) => e.preventDefault()}>
-      <button onClick={() => applyFormat('bold')} className={`rich-text-toolbar-button ${activeFormats.bold ? 'active' : ''}`}><BoldIcon className="w-5 h-5"/></button>
-      <button onClick={() => applyFormat('italic')} className={`rich-text-toolbar-button ${activeFormats.italic ? 'active' : ''}`}><ItalicIcon className="w-5 h-5"/></button>
-      <button onClick={() => applyFormat('underline')} className={`rich-text-toolbar-button ${activeFormats.underline ? 'active' : ''}`}><UnderlineIcon className="w-5 h-5"/></button>
-      <button onClick={() => applyFormat('strikethrough')} className={`rich-text-toolbar-button ${activeFormats.strikethrough ? 'active' : ''}`}><StrikethroughIcon className="w-5 h-5"/></button>
-      <button onClick={() => applyFormat('insertOrderedList')} className={`rich-text-toolbar-button ${activeFormats.insertOrderedList ? 'active' : ''}`}><ListOrderedIcon className="w-5 h-5"/></button>
-      <button onClick={() => applyFormat('insertUnorderedList')} className={`rich-text-toolbar-button ${activeFormats.insertUnorderedList ? 'active' : ''}`}><ListUnorderedIcon className="w-5 h-5"/></button>
+      <button onMouseDown={saveSelection} onClick={() => applyFormat('bold')} className={`rich-text-toolbar-button ${activeFormats.bold ? 'active' : ''}`}><BoldIcon className="w-5 h-5"/></button>
+      <button onMouseDown={saveSelection} onClick={() => applyFormat('italic')} className={`rich-text-toolbar-button ${activeFormats.italic ? 'active' : ''}`}><ItalicIcon className="w-5 h-5"/></button>
+      <button onMouseDown={saveSelection} onClick={() => applyFormat('underline')} className={`rich-text-toolbar-button ${activeFormats.underline ? 'active' : ''}`}><UnderlineIcon className="w-5 h-5"/></button>
+      <button onMouseDown={saveSelection} onClick={() => applyFormat('strikethrough')} className={`rich-text-toolbar-button ${activeFormats.strikethrough ? 'active' : ''}`}><StrikethroughIcon className="w-5 h-5"/></button>
+      <button onMouseDown={saveSelection} onClick={() => applyFormat('insertOrderedList')} className={`rich-text-toolbar-button ${activeFormats.insertOrderedList ? 'active' : ''}`}><ListOrderedIcon className="w-5 h-5"/></button>
+      <button onMouseDown={saveSelection} onClick={() => applyFormat('insertUnorderedList')} className={`rich-text-toolbar-button ${activeFormats.insertUnorderedList ? 'active' : ''}`}><ListUnorderedIcon className="w-5 h-5"/></button>
       <button onClick={toggleLink} className={`rich-text-toolbar-button ${activeFormats.link ? 'active' : ''}`}><ChainLinkIcon className="w-5 h-5"/></button>
       <div className="relative">
           <button onClick={handleColorPickerToggle} className="rich-text-toolbar-button"><TextColorIcon className="w-5 h-5"/></button>

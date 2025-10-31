@@ -36,6 +36,15 @@ const ContentEditable: React.FC<ContentEditableProps> = ({ html, onChange, tagNa
         const text = e.clipboardData.getData('text/plain');
         document.execCommand('insertText', false, text);
     }, []);
+    
+    // FIX: Intercept the Enter key to enforce consistent line breaks.
+    const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+        // Make 'Enter' consistently create a line break to prevent inconsistent browser behavior (e.g., creating <div>s).
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            document.execCommand('insertHTML', false, '<br><br>');
+        }
+    }, []);
 
     // FIX: Replaced JSX with dynamic tag with React.createElement to resolve JSX namespace and signature errors.
     return React.createElement(tagName, {
@@ -46,6 +55,7 @@ const ContentEditable: React.FC<ContentEditableProps> = ({ html, onChange, tagNa
         suppressContentEditableWarning: true,
         onInput: handleInput,
         onPaste: handlePaste,
+        onKeyDown: handleKeyDown,
         dangerouslySetInnerHTML: { __html: html }
     });
 };

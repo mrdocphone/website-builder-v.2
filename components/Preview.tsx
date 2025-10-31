@@ -1,7 +1,7 @@
 
 import React, { useMemo, useState } from 'react';
-import type { WebsiteData, ThemeConfig, Theme, WebsiteNode, Element as IElement, HeadlineElement, TextElement, ImageElement, ButtonElement, VideoElement, IconElement, Column, Device, ResponsiveStyles, StyleProperties, EmbedElement, FormElement, Page, NavigationElement, GalleryElement, DividerElement, MapElement, AccordionElement, TabsElement, SocialIconsElement, FormField } from '../types';
-import { PlusIcon, availableIcons, IconRenderer as Icon } from './icons';
+import type { WebsiteData, ThemeConfig, Theme, WebsiteNode, Element as IElement, HeadlineElement, TextElement, ImageElement, ButtonElement, VideoElement, IconElement, Column, Device, ResponsiveStyles, StyleProperties, EmbedElement, FormElement, Page, NavigationElement, GalleryElement, DividerElement, MapElement, AccordionElement, TabsElement, SocialIconsElement, FormField, NavLink } from '../types';
+import { PlusIcon, availableIcons, IconRenderer as Icon, MagicWandIcon } from './icons';
 import AiToolbar from './AiToolbar';
 import RichTextToolbar from './RichTextToolbar';
 import ContentEditable from './ContentEditable';
@@ -22,6 +22,8 @@ interface PreviewProps {
   onContextMenuRequest?: (e: React.MouseEvent, nodeId: string) => void;
   onAddSection?: (context: 'page' | 'header' | 'footer') => void;
   onDuplicateNode?: (id: string) => void;
+  onGenerateSection?: (sectionId: string) => void;
+  generatingSectionId?: string | null;
 }
 
 const themeConfigs: Record<Theme, ThemeConfig> = {
@@ -200,6 +202,26 @@ const ElementRenderer: React.FC<{
         }
         case 'video': {
             const { src, autoplay, loop, muted, controls } = element.content as VideoElement['content'];
+            if (!src) return <div className="p-4 bg-yellow-100 text-yellow-700 rounded">Video URL is missing.</div>;
+
+            // FEAT: Add support for direct video file URLs
+            if (src.match(/\.(mp4|webm|ogg)$/i)) {
+                return (
+                    <div className="aspect-video w-full">
+                        <video 
+                            src={src} 
+                            autoPlay={autoplay} 
+                            loop={loop} 
+                            muted={muted} 
+                            controls={controls !== false} 
+                            className="w-full h-full bg-black"
+                        >
+                            Your browser does not support the video tag.
+                        </video>
+                    </div>
+                )
+            }
+
             let embedSrc = '';
             const queryParams = new URLSearchParams();
             if (autoplay) queryParams.set('autoplay', '1');
@@ -219,7 +241,7 @@ const ElementRenderer: React.FC<{
                 const videoId = src.split('vimeo.com/')[1].split('?')[0];
                 embedSrc = `https://player.vimeo.com/video/${videoId}?${queryParams.toString()}`;
             }
-            if (!embedSrc) return <div className="p-4 bg-red-100 text-red-700 rounded">Invalid Video URL</div>;
+            if (!embedSrc) return <div className="p-4 bg-red-100 text-red-700 rounded">Invalid or unsupported Video URL</div>;
             return (
                 <div className="aspect-video w-full">
                     <iframe className="w-full h-full" src={embedSrc} title="Video player" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
@@ -258,12 +280,32 @@ const ElementRenderer: React.FC<{
             return <div dangerouslySetInnerHTML={{ __html: html }} />;
         }
         case 'navigation': {
+            const { links } = element.content as NavigationElement['content'];
+            if (!links || links.length === 0) {
+                if (interactive) {
+                    return <div className="p-4 text-center bg-slate-50 border-dashed border-2 rounded-md text-slate-500">Add nav links in the Style Panel.</div>;
+                }
+                return null;
+            }
             return (
                 <nav className="preview-nav w-full">
                     <ul>
-                        {websiteData.pages.filter(p => !p.isDraft).map(page => (
-                            <li key={page.id}><a href={`/${page.slug}`}>{page.name}</a></li>
-                        ))}
+                        {links.map((link: NavLink) => {
+                            const page = link.type === 'internal' ? websiteData.pages.find(p => p.id === link.pageId) : null;
+                            const href = link.type === 'internal' 
+                                ? page ? `/${websiteData.id}/${page.slug}` : '#'
+                                : link.href || '#';
+                            
+                            if (link.type === 'internal' && !page) return null;
+
+                            return (
+                                <li key={link.id}>
+                                    <a href={href} target={link.openInNewTab ? '_blank' : '_self'} rel={link.openInNewTab ? 'noopener noreferrer' : ''}>
+                                        {link.text}
+                                    </a>
+                                </li>
+                            )
+                        })}
                     </ul>
                 </nav>
             )
@@ -313,7 +355,9 @@ const InteractiveWrapper: React.FC<React.PropsWithChildren<{
     isAiLoading?: boolean;
     onContextMenuRequest?: (e: React.MouseEvent, nodeId: string) => void;
     onDuplicateNode?: (id: string) => void;
-}>> = ({ children, node, interactive, isSelected, isHovered, onSelect, onHover, onUpdateNode, onAiTextUpdate, isAiLoading, onContextMenuRequest, onDuplicateNode }) => {
+    onGenerateSection?: (sectionId: string) => void;
+    generatingSectionId?: string | null;
+}>> = ({ children, node, interactive, isSelected, isHovered, onSelect, onHover, onUpdateNode, onAiTextUpdate, isAiLoading, onContextMenuRequest, onDuplicateNode, onGenerateSection, generatingSectionId }) => {
     if (!interactive) {
         return <div data-node-id={node.id}>{children}</div>;
     }
@@ -346,7 +390,8 @@ const InteractiveWrapper: React.FC<React.PropsWithChildren<{
     const wrapperClasses = [
         'interactive-wrapper',
         isSelected ? 'selected' : '',
-        isHovered ? 'hovered' : ''
+        isHovered ? 'hovered' : '',
+        node.type === 'section' && isSelected ? 'section-selected' : '',
     ].join(' ').trim();
     
     const isAiTextElement = ['headline', 'text', 'button'].includes(node.type);
@@ -368,6 +413,16 @@ const InteractiveWrapper: React.FC<React.PropsWithChildren<{
                     onAiAction={onAiTextUpdate} 
                     isLoading={isAiLoading} 
                 />
+            )}
+            {isSelected && node.type === 'section' && (node as any).children?.[0]?.children?.[0]?.children.length === 0 && onGenerateSection && (
+                 <button onClick={() => onGenerateSection(node.id)} className="ai-section-button bg-indigo-600 text-white font-semibold py-1.5 px-3 rounded-md text-sm hover:bg-indigo-700 flex items-center gap-2">
+                    <MagicWandIcon className="w-4 h-4" /> Generate with AI
+                </button>
+            )}
+            {generatingSectionId === node.id && (
+                <div className="ai-generating-overlay">
+                    <div className="dashboard-spinner"></div>
+                </div>
             )}
             {isSelected && isRichTextElement && <RichTextToolbar />}
             {children}
@@ -425,7 +480,7 @@ const NodeRenderer: React.FC<Omit<PreviewProps, 'websiteData' | 'activePage'> & 
     switch(node.type) {
         case 'section':
             Tag = 'section';
-            className = 'w-full';
+            className = 'w-full relative'; // Added relative for AI button positioning
             if (node.animation && node.animation !== 'none') {
                 dataAttributes['data-animation'] = node.animation;
             }
@@ -441,9 +496,11 @@ const NodeRenderer: React.FC<Omit<PreviewProps, 'websiteData' | 'activePage'> & 
              if ((node as Column).children.length === 0 && props.interactive) {
                 // FIX: Added a visible placeholder for empty columns in the editor for better UX.
                 return (
-                    <div className="p-4 min-h-[50px] w-full flex items-center justify-center text-center text-xs text-slate-400 bg-slate-50 border-2 border-dashed border-slate-300 rounded-md" style={mergedStyles}>
-                        Click to add elements here
-                    </div>
+                    <InteractiveWrapper {...props} node={node} isSelected={isSelected} isHovered={isHovered}>
+                         <div className="p-4 min-h-[50px] w-full flex items-center justify-center text-center text-xs text-slate-400 bg-slate-50 border-2 border-dashed border-slate-300 rounded-md" style={mergedStyles}>
+                            Click to add elements here
+                        </div>
+                    </InteractiveWrapper>
                 )
             }
             break;
