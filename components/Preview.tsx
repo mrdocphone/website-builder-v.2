@@ -1,4 +1,3 @@
-
 import React, { useMemo } from 'react';
 import type { WebsiteData, ThemeConfig, Theme, WebsiteNode, Element as ElementType, HeadlineElement, TextElement, ImageElement, ButtonElement, Column } from '../types';
 import { PlusIcon } from './icons';
@@ -175,14 +174,14 @@ const Preview: React.FC<PreviewProps> = (props) => {
   return (
     <div className={`w-full h-full overflow-y-auto ${theme.bg} ${theme.text} transition-colors duration-300`}>
       <header className={`p-6 sticky top-0 ${theme.bg} bg-opacity-80 backdrop-blur-sm z-20`}>
-        <h1 className={`text-2xl font-bold ${theme.headerText}`}>{websiteData.businessName}</h1>
+        <h1 className={`text-2xl font-bold ${theme.headerText}`}>{websiteData.name}</h1>
       </header>
 
       <section className="relative h-72">
-        <img src={websiteData.heroImageUrl} alt={`${websiteData.businessName} hero image`} className="w-full h-full object-cover" />
+        <img src={websiteData.heroImageUrl} alt={`${websiteData.name} hero image`} className="w-full h-full object-cover" />
         <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center p-6">
           <div className="text-center">
-            <h2 className="text-4xl font-extrabold text-white">{websiteData.businessName}</h2>
+            <h2 className="text-4xl font-extrabold text-white">{websiteData.name}</h2>
             <p className="mt-2 text-lg text-slate-200">{websiteData.tagline}</p>
           </div>
         </div>
@@ -195,7 +194,7 @@ const Preview: React.FC<PreviewProps> = (props) => {
       </main>
 
       <footer className={`py-6 px-6 text-center ${theme.footerBg} ${theme.footerText}`}>
-        <p>&copy; {new Date().getFullYear()} {websiteData.businessName}. All rights reserved.</p>
+        <p>&copy; {new Date().getFullYear()} {websiteData.name}. All rights reserved.</p>
       </footer>
     </div>
   );

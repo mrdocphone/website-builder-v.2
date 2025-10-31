@@ -1,7 +1,3 @@
-
-
-
-
 // FIX: Corrected the invalid import syntax. `aistudio` was a typo and `useState` should be destructured.
 import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, Navigate, Outlet } from 'react-router-dom';
@@ -12,7 +8,7 @@ import UserManagementDashboard from './components/UserManagementDashboard';
 import Signup from './components/Signup';
 import type { Session } from './types';
 import Editor from './components/Editor';
-import { LogoutIcon, PencilIcon, LinkIcon } from './components/icons';
+import WebsiteDashboard from './components/WebsiteDashboard';
 
 const getInitialSession = (): Session => {
     const storedSession = localStorage.getItem('session');
@@ -32,46 +28,6 @@ const getInitialSession = (): Session => {
     return { isAuthenticated: false, type: null, username: null };
 };
 
-const UserDashboard: React.FC<{ onLogout: () => void, session: Session }> = ({ onLogout, session }) => {
-    const navigate = useNavigate();
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-100 font-sans p-4">
-        <div className="w-full max-w-2xl p-8 space-y-6 bg-white rounded-lg shadow-xl text-center">
-            <h1 className="text-3xl font-bold text-slate-800">Welcome, {session.username}</h1>
-            <p className="mt-2 text-slate-600">
-              Manage your website from the editor or view your published site.
-            </p>
-            <div className="mt-6 flex flex-col sm:flex-row justify-center items-center gap-4">
-              <button
-                onClick={() => navigate('/editor')}
-                className="w-full sm:w-auto flex items-center justify-center px-6 py-3 text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
-              >
-                <PencilIcon className="w-5 h-5 mr-3" />
-                Go to Editor
-              </button>
-              <a
-                href={`/${session.username}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full sm:w-auto flex items-center justify-center px-6 py-3 text-sm font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200"
-              >
-                  <LinkIcon className="w-5 h-5 mr-3" />
-                  View Published Site
-              </a>
-            </div>
-            <div className="mt-8">
-              <button
-                onClick={onLogout}
-                className="w-full max-w-xs mx-auto flex items-center justify-center px-4 py-2.5 text-sm font-medium rounded-md text-slate-600 bg-slate-100 hover:bg-slate-200"
-              >
-                <LogoutIcon className="w-5 h-5 mr-3" />
-                Logout
-              </button>
-            </div>
-        </div>
-      </div>
-    );
-};
 
 const AppContent: React.FC = () => {
     const navigate = useNavigate();
@@ -153,8 +109,8 @@ const AppContent: React.FC = () => {
 
             {/* User Protected Routes */}
             <Route element={<UserRouteProtection />}>
-                <Route path="/dashboard" element={<UserDashboard onLogout={handleLogout} session={session} />} />
-                <Route path="/editor" element={<Editor session={session} />} />
+                <Route path="/dashboard" element={<WebsiteDashboard onLogout={handleLogout} session={session} />} />
+                <Route path="/editor/:websiteId" element={<Editor session={session} />} />
             </Route>
             
             {/* --- Published Site Routes (Catch-all) --- */}

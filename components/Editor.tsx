@@ -1,6 +1,6 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { useImmer } from 'use-immer';
+import { useParams } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
 import type { WebsiteData, WebsiteNode, Section, Session } from '../types';
 import { findNodeById, updateNodeById, removeNodeById, addNode } from '../utils/tree';
@@ -9,74 +9,49 @@ import SectionEditorForm from './SectionEditorForm';
 import Preview from './Preview';
 import PublishModal from './PublishModal';
 
-const defaultWebsiteData: WebsiteData = {
-  businessName: 'My Awesome Business',
-  tagline: 'The best products you have ever seen.',
-  slug: 'home',
-  theme: 'light',
-  heroImageUrl: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?q=80&w=2071&auto=format&fit=crop',
-  children: [
-    {
-      id: uuidv4(),
-      type: 'section',
-      styles: { paddingTop: '2rem', paddingBottom: '2rem' },
-      children: [
-        {
-          id: uuidv4(),
-          type: 'row',
-          styles: {},
-          children: [
-            {
-              id: uuidv4(),
-              type: 'column',
-              styles: {},
-              children: [
-                { id: uuidv4(), type: 'headline', styles: { textAlign: 'center' }, content: { level: 'h2', text: 'About Us' } },
-                { id: uuidv4(), type: 'text', styles: {}, content: { text: 'We are a company dedicated to providing the highest quality products and services. Our team is passionate and experienced.' } }
-              ]
-            }
-          ]
-        }
-      ]
-    }
-  ]
-};
-
 const Editor: React.FC<{session: Session}> = ({ session }) => {
+  const { websiteId } = useParams<{ websiteId: string }>();
   const [websiteData, setWebsiteData] = useImmer<WebsiteData | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const loadData = async () => {
-      if (!session.username) return;
+      if (!websiteId) {
+          setError("No website ID provided.");
+          return;
+      };
+      setError(null);
+      setWebsiteData(null); // Reset while loading
       try {
-        const res = await fetch(`/api/editor-data?username=${session.username}`);
+        const res = await fetch(`/api/editor-data?websiteId=${websiteId}`);
         if (res.ok) {
           const data = await res.json();
           setWebsiteData(data);
         } else {
-          setWebsiteData(defaultWebsiteData);
+          const errorData = await res.json();
+          setError(errorData.message || "Could not load website data. It may have been deleted.");
         }
       } catch (e) {
         console.error("Failed to load editor data", e);
-        setWebsiteData(defaultWebsiteData);
+        setError("An error occurred while trying to load your website.");
       }
     };
     loadData();
-  }, [session.username, setWebsiteData]);
+  }, [websiteId, setWebsiteData]);
 
   const handleSave = useCallback(async () => {
-    if (!websiteData || !session.username) return;
+    if (!websiteData || !session.username || !websiteId) return;
     setIsSaving(true);
     try {
       await fetch('/api/editor-data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: session.username, websiteData })
+        body: JSON.stringify({ websiteId, websiteData })
       });
       setLastSaved(new Date());
     } catch (error) {
@@ -84,7 +59,7 @@ const Editor: React.FC<{session: Session}> = ({ session }) => {
     } finally {
       setIsSaving(false);
     }
-  }, [websiteData, session.username]);
+  }, [websiteData, session.username, websiteId]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -140,6 +115,9 @@ const Editor: React.FC<{session: Session}> = ({ session }) => {
 
   const selectedNode = selectedNodeId && websiteData ? findNodeById(websiteData.children, selectedNodeId) : null;
 
+  if (error) {
+    return <div className="flex justify-center items-center h-screen text-red-600 font-semibold p-4 text-center">{error}</div>;
+  }
   if (!websiteData) {
     return <div className="flex justify-center items-center h-screen">Loading Editor...</div>;
   }
@@ -148,7 +126,7 @@ const Editor: React.FC<{session: Session}> = ({ session }) => {
     <div className="editor-container">
       <aside className="editor-sidebar">
         <div className="p-4 border-b">
-          <h2 className="text-xl font-bold">Editor</h2>
+          <h2 className="text-xl font-bold">{websiteData.name}</h2>
           <div className="text-xs text-slate-500 h-4">
               {isSaving ? 'Saving...' : lastSaved ? `Last saved: ${lastSaved.toLocaleTimeString()}` : ''}
           </div>

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import type { WebsiteData, Theme } from '../types';
 import type { Updater } from 'use-immer';
@@ -38,11 +37,11 @@ const GlobalSettingsForm: React.FC<GlobalSettingsFormProps> = ({ websiteData, se
         <h3 className="text-lg font-semibold mb-2 text-slate-700">Global Settings</h3>
         <div className="space-y-4">
           <div>
-            <label className="text-sm font-medium text-slate-600 block mb-1">Business Name</label>
+            <label className="text-sm font-medium text-slate-600 block mb-1">Website Name</label>
             <input
               type="text"
-              value={websiteData.businessName}
-              onChange={(e) => handleInputChange('businessName', e.target.value)}
+              value={websiteData.name}
+              onChange={(e) => handleInputChange('name', e.target.value)}
               className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm"
             />
           </div>

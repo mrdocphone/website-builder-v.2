@@ -81,7 +81,7 @@ const PublishModal: React.FC<PublishModalProps> = ({ username, websiteData, onCl
                 </div>
             ) : (
                 <>
-                    <p className="text-slate-600 mb-4">Set a URL path for your website. Use "home" for your main page.</p>
+                    <p className="text-slate-600 mb-4">Set a URL path for this page. Use "home" for your main page.</p>
                     <div>
                         <label htmlFor="slug" className="text-sm font-medium text-slate-700 block mb-2">URL Path</label>
                         <div className="flex items-center">

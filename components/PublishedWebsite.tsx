@@ -42,7 +42,7 @@ const PublishedWebsite: React.FC = () => {
             // The data is now validated on the server-side.
             // If we receive a 200 OK, we can assume the data format is correct.
             setWebsiteData(parsedData);
-            document.title = parsedData.businessName;
+            document.title = parsedData.name;
 
         } catch (e) {
             setError(e instanceof Error ? e.message : "An unknown error occurred.");

@@ -10,22 +10,22 @@ export const config = {
 export default async function handler(request: Request) {
     if (request.method === 'GET') {
         const { searchParams } = new URL(request.url);
-        const username = searchParams.get('username');
-        if (!username) {
-            return new Response(JSON.stringify({ message: 'Username is required.' }), { status: 400 });
+        const websiteId = searchParams.get('websiteId');
+        if (!websiteId) {
+            return new Response(JSON.stringify({ message: 'Website ID is required.' }), { status: 400 });
         }
-        const data = await kv.get<WebsiteData>(`editor:${username}`);
+        const data = await kv.get<WebsiteData>(`editor:${websiteId}`);
         if (data) {
             return new Response(JSON.stringify(data), { status: 200, headers: { 'Content-Type': 'application/json' } });
         }
-        return new Response(JSON.stringify({ message: 'No editor data found.' }), { status: 404 });
+        return new Response(JSON.stringify({ message: 'No editor data found for this website.' }), { status: 404 });
 
     } else if (request.method === 'POST') {
-        const { username, websiteData } = (await request.json()) as { username: string, websiteData: WebsiteData };
-        if (!username || !websiteData) {
-            return new Response(JSON.stringify({ message: 'Username and website data are required.' }), { status: 400 });
+        const { websiteId, websiteData } = (await request.json()) as { websiteId: string, websiteData: WebsiteData };
+        if (!websiteId || !websiteData) {
+            return new Response(JSON.stringify({ message: 'Website ID and website data are required.' }), { status: 400 });
         }
-        await kv.set(`editor:${username}`, JSON.stringify(websiteData));
+        await kv.set(`editor:${websiteId}`, JSON.stringify(websiteData));
         return new Response(JSON.stringify({ success: true }), { status: 200 });
         
     } else {

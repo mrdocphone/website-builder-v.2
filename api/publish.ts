@@ -15,8 +15,8 @@ export default async function handler(request: Request) {
     try {
         const { username, websiteData } = (await request.json()) as { username: string, websiteData: WebsiteData };
 
-        if (!username || !websiteData || !websiteData.slug) {
-            return new Response(JSON.stringify({ message: 'Username and website data with a slug are required.' }), { status: 400 });
+        if (!username || !websiteData || !websiteData.slug || !websiteData.id) {
+            return new Response(JSON.stringify({ message: 'Username and complete website data (including ID and slug) are required.' }), { status: 400 });
         }
         
         // Sanitize on the server-side to guarantee key format consistency.
@@ -30,7 +30,7 @@ export default async function handler(request: Request) {
         const key = `site:${safeUsername}/${safeSlug}`;
         const mainKey = `site:${safeUsername}`;
         
-        // Ensure the data being saved contains the sanitized slug
+        // Ensure the data being saved contains the sanitized slug and the websiteId
         const dataToSave = { ...websiteData, slug: safeSlug };
 
         // Save the specific page

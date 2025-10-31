@@ -64,7 +64,8 @@ export type WebsiteNode = Section | Row | Column | Element;
 
 // TOP-LEVEL WEBSITE DATA
 export interface WebsiteData {
-  businessName: string;
+  id: string;
+  name: string;
   tagline: string;
   slug: string;
   theme: Theme;

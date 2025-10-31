@@ -18,7 +18,7 @@ export const generateSectionContent = async (
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        businessName: websiteData.businessName,
+        businessName: websiteData.name,
         tagline: websiteData.tagline,
         section,
       }),

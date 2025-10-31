@@ -23,13 +23,13 @@ export default async function handler(request: Request) {
         const userSiteKeys: string[] = [];
         let cursor = 0;
         do {
-            // The match pattern finds all keys that start with "site:username",
-            // which includes the main page key and all sub-pages.
             const [nextCursor, keys] = await kv.scan(cursor, { match: `site:${username}*` });
             cursor = nextCursor;
             userSiteKeys.push(...keys);
         } while (cursor !== 0);
 
+        // Find all of the user's website editor data IDs
+        const websiteIds = await kv.smembers(`user:${username}:websites`);
 
         // Prepare deletion pipeline
         const pipeline = kv.pipeline();
@@ -37,8 +37,8 @@ export default async function handler(request: Request) {
         // 1. Delete user account record
         pipeline.del(`user:${username}`);
         
-        // 2. Delete user's saved editor data
-        pipeline.del(`editor:${username}`);
+        // 2. Delete user's set of websites
+        pipeline.del(`user:${username}:websites`);
         
         // 3. Remove user from the master user list
         pipeline.srem('users', username);
@@ -46,6 +46,11 @@ export default async function handler(request: Request) {
         // 4. Delete all of the user's published sites if any keys were found
         if (userSiteKeys.length > 0) {
            pipeline.del(...userSiteKeys);
+        }
+
+        // 5. Delete all of the user's saved editor data
+        if (websiteIds.length > 0) {
+            pipeline.del(...websiteIds.map(id => `editor:${id}`));
         }
 
         // Execute all deletions in a single transaction

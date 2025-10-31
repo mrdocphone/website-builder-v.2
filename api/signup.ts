@@ -1,4 +1,6 @@
 import { kv } from '@vercel/kv';
+import { v4 as uuidv4 } from 'uuid';
+import type { WebsiteData, Section } from '../types';
 
 export const config = {
   runtime: 'edge',
@@ -13,6 +15,36 @@ async function hashPassword(password: string): Promise<string> {
   const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
   return hashHex;
 }
+
+const createDefaultWebsite = (id: string, name: string): WebsiteData => ({
+  id,
+  name,
+  slug: 'home',
+  tagline: 'Your amazing tagline here!',
+  theme: 'light',
+  heroImageUrl: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?q=80&w=2071&auto=format&fit=crop',
+  children: [
+    {
+      id: uuidv4(),
+      type: 'section',
+      styles: { paddingTop: '2rem', paddingBottom: '2rem' },
+      children: [{
+        id: uuidv4(),
+        type: 'row',
+        styles: {},
+        children: [{
+          id: uuidv4(),
+          type: 'column',
+          styles: {},
+          children: [
+            { id: uuidv4(), type: 'headline', styles: { textAlign: 'center' }, content: { level: 'h2', text: 'Welcome to Your New Website' } },
+            { id: uuidv4(), type: 'text', styles: {}, content: { text: 'This is your first section. You can edit this text, change the layout, and add more content using the editor.' } }
+          ]
+        }]
+      }]
+    }
+  ]
+});
 
 export default async function handler(request: Request) {
   if (request.method !== 'POST') {
@@ -45,11 +77,21 @@ export default async function handler(request: Request) {
         createdAt: new Date().toISOString() // Add timestamp
     };
 
-    // Store user data and add username to the master user set
-    await Promise.all([
-        kv.set(`user:${username}`, JSON.stringify(newUser)),
-        kv.sadd('users', username)
-    ]);
+    // Create a default website for the new user
+    const firstWebsiteId = uuidv4();
+    const firstWebsiteData = createDefaultWebsite(firstWebsiteId, 'My First Website');
+
+    const pipeline = kv.pipeline();
+    // Store user data
+    pipeline.set(`user:${username}`, JSON.stringify(newUser));
+    // Add user to the master user set
+    pipeline.sadd('users', username);
+    // Store the new website's editor data
+    pipeline.set(`editor:${firstWebsiteId}`, JSON.stringify(firstWebsiteData));
+    // Add the new website's ID to the user's list of websites
+    pipeline.sadd(`user:${username}:websites`, firstWebsiteId);
+
+    await pipeline.exec();
 
     return new Response(JSON.stringify({ success: true, username: newUser.username }), { status: 201 });
 
