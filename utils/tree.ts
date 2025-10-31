@@ -22,13 +22,12 @@ export function updateNodeById(nodes: WebsiteNode[], id: string, updates: Partia
     for (let i = 0; i < nodes.length; i++) {
         const node = nodes[i];
         if (node.id === id) {
-            // FIX: Refactored the update logic to prevent incorrect type compositions.
+            // Refactored the update logic to prevent incorrect type compositions.
             // Apply shallow updates first.
             const updatedNode = { ...node, ...updates };
 
             // Then, handle deep merges for nested properties if they were part of the updates.
             // This prevents the shallow spread from overwriting nested objects incorrectly.
-            // FIX: Added a type guard `'content' in updates` to ensure `updates.content` can be safely accessed.
             if ('content' in updates && updates.content && 'content' in node && node.content) {
                 (updatedNode as any).content = { ...node.content, ...updates.content };
             }
@@ -100,15 +99,16 @@ const createDefaultElement = (type: Element['type']): Element => {
         case 'embed': return { ...base, type: 'embed', content: { html: '<p class="p-4 bg-slate-100 rounded text-center">Your embedded content will show here.</p>' } };
         case 'navigation': return { ...base, type: 'navigation', content: {} };
         case 'gallery': return { ...base, type: 'gallery', content: { images: [ { src: 'https://images.unsplash.com/photo-1599420186946-7b6fb4e297f0?q=80&w=1887', alt: 'Placeholder 1'}, { src: 'https://images.unsplash.com/photo-1581093450021-4a7360e9a1c8?q=80&w=1887', alt: 'Placeholder 2'}, { src: 'https://images.unsplash.com/photo-1518770660439-4636190af475?q=80&w=2070', alt: 'Placeholder 3'}, { src: 'https://images.unsplash.com/photo-1620712943543-2858200f7426?q=80&w=2070', alt: 'Placeholder 4'} ]} };
-        // FIX: Replaced invalid `margin` property with `marginTop` and `marginBottom`.
         case 'divider': return { ...base, type: 'divider', content: {}, styles: { desktop: { height: '1px', backgroundColor: '#cbd5e1', marginTop: '1rem', marginBottom: '1rem' }, tablet: {}, mobile: {} } };
         case 'map': return { ...base, type: 'map', content: { embedUrl: 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3022.610224424263!2d-73.98785368459384!3d40.74844097932824!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x89c259a9b3117469%3A0xd134e199a405a163!2sEmpire%20State%20Building!5e0!3m2!1sen!2sus!4v1676231998539!5m2!1sen!2sus' } };
+        case 'accordion': return { ...base, type: 'accordion', content: { items: [ {id: uuidv4(), title: "Item 1", content: "Content for item 1"}, {id: uuidv4(), title: "Item 2", content: "Content for item 2"} ]}};
+        case 'tabs': return { ...base, type: 'tabs', content: { items: [ {id: uuidv4(), title: "Tab 1", content: [createDefaultElement('text')]}, {id: uuidv4(), title: "Tab 2", content: [createDefaultElement('text')]} ]}};
+        case 'socialIcons': return { ...base, type: 'socialIcons', content: { networks: [ { id: uuidv4(), network: 'twitter', url: '#' }, { id: uuidv4(), network: 'facebook', url: '#' }, { id: uuidv4(), network: 'instagram', url: '#' } ]}};
     }
 }
 
 
 // Immer-compatible function to add a new node
-// FIX: Widen type to include 'section' to match implementation and fix comparison error.
 export const addNode = (draft: { children: WebsiteNode[] }, parentId: string, type: 'section' | 'row' | 'column' | Element['type']) => {
     // Handle adding a section to the root (the page)
     if (draft.children.find(c => c.id === parentId) && type === 'section') {
@@ -120,8 +120,6 @@ export const addNode = (draft: { children: WebsiteNode[] }, parentId: string, ty
     const parent = findNodeById(draft.children, parentId);
     if (!parent || !('children' in parent) || !Array.isArray(parent.children)) return;
 
-    // FIX: Add check for 'section' to narrow the `type` variable for the switch statement below.
-    // Sections can only be added to the root, which is handled above.
     if (type === 'section') {
         return;
     }
@@ -151,13 +149,23 @@ export const addNode = (draft: { children: WebsiteNode[] }, parentId: string, ty
     }
 };
 
-// FIX: Implement duplicateNodeById to handle node duplication logic.
 // Deep copy a node and assign new IDs to it and all its children.
-function deepCloneWithNewIds(node: WebsiteNode): WebsiteNode {
+function deepCloneWithNewIds(node: any): any {
     const newNode = { ...node, id: uuidv4() };
 
-    if ('children' in newNode && Array.isArray(newNode.children)) {
-        (newNode as any).children = newNode.children.map(child => deepCloneWithNewIds(child as WebsiteNode));
+    if (Array.isArray(newNode.children)) {
+        newNode.children = newNode.children.map(deepCloneWithNewIds);
+    }
+    
+    // Also handle nested content structures like Tabs
+    if (typeof newNode.content === 'object' && newNode.content !== null && Array.isArray(newNode.content.items)) {
+        newNode.content.items = newNode.content.items.map((item: any) => {
+             const newItem = {...item, id: uuidv4()};
+             if (Array.isArray(newItem.content)) {
+                 newItem.content = newItem.content.map(deepCloneWithNewIds);
+             }
+             return newItem;
+        });
     }
 
     return newNode;
@@ -209,7 +217,7 @@ const validChildrenMap: Record<string, string[]> = {
     page: ['section'], // Page is the new root
     section: ['row'],
     row: ['column'],
-    column: ['headline', 'text', 'image', 'button', 'spacer', 'icon', 'video', 'form', 'embed', 'navigation', 'gallery', 'divider', 'map'],
+    column: ['headline', 'text', 'image', 'button', 'spacer', 'icon', 'video', 'form', 'embed', 'navigation', 'gallery', 'divider', 'map', 'accordion', 'tabs', 'socialIcons'],
 };
 
 export const moveNode = (root: WebsiteNode[], sourceId: string, targetId: string, position: 'before' | 'after') => {

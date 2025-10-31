@@ -4,6 +4,19 @@
 export type Theme = 'light' | 'dark' | 'ocean' | 'forest';
 export type Device = 'desktop' | 'tablet' | 'mobile';
 
+// NEW: Global Styles
+export interface GlobalColor {
+    id: string;
+    name: string;
+    value: string;
+}
+export interface GlobalTypography {
+    id: string;
+    name: string;
+    styles: ResponsiveStyles;
+}
+
+
 // STYLING TYPES
 export interface StyleProperties {
   // Spacing
@@ -13,36 +26,98 @@ export interface StyleProperties {
   paddingRight?: string;
   marginTop?: string;
   marginBottom?: string;
+  marginLeft?: string;
+  marginRight?: string;
   gap?: string;
   // Typography
   color?: string;
   fontSize?: string;
   textAlign?: 'left' | 'center' | 'right' | 'justify';
-  fontWeight?: 'normal' | 'bold';
+  fontWeight?: 'normal' | 'bold' | '100' | '200' | '300' | '400' | '500' | '600' | '700' | '800' | '900';
   fontStyle?: 'normal' | 'italic' | 'oblique';
+  textDecoration?: 'none' | 'underline' | 'line-through' | 'overline';
+  textTransform?: 'none' | 'capitalize' | 'uppercase' | 'lowercase';
+  lineHeight?: string;
+  letterSpacing?: string;
+  textShadow?: string;
   // Background
   backgroundColor?: string;
   backgroundImage?: string; // For gradients and images
+  backgroundSize?: 'auto' | 'cover' | 'contain';
+  backgroundPosition?: string;
+  backgroundRepeat?: 'repeat' | 'no-repeat' | 'repeat-x' | 'repeat-y';
   // Border
   borderRadius?: string;
+  borderTopLeftRadius?: string;
+  borderTopRightRadius?: string;
+  borderBottomLeftRadius?: string;
+  borderBottomRightRadius?: string;
   borderWidth?: string;
+  borderTopWidth?: string;
+  borderRightWidth?: string;
+  borderBottomWidth?: string;
+  borderLeftWidth?: string;
   borderStyle?: 'none' | 'solid' | 'dashed' | 'dotted' | 'double';
+  borderTopStyle?: 'none' | 'solid' | 'dashed' | 'dotted' | 'double';
+  borderRightStyle?: 'none' | 'solid' | 'dashed' | 'dotted' | 'double';
+  borderBottomStyle?: 'none' | 'solid' | 'dashed' | 'dotted' | 'double';
+  borderLeftStyle?: 'none' | 'solid' | 'dashed' | 'dotted' | 'double';
   borderColor?: string;
+  borderTopColor?: string;
+  borderRightColor?: string;
+  borderBottomColor?: string;
+  borderLeftColor?: string;
   // Dimensions
-  height?: string; // For Spacer
+  height?: string;
   width?: string;
-  // Layout (Flexbox)
-  display?: 'flex' | 'none'; // Added 'none' for visibility
+  minWidth?: string;
+  maxWidth?: string;
+  minHeight?: string;
+  maxHeight?: string;
+  // Layout (Flexbox & Grid)
+  display?: 'flex' | 'grid' | 'block' | 'inline-block' | 'inline' | 'none';
+  // Flex Container
   flexDirection?: 'row' | 'column';
   justifyContent?: 'flex-start' | 'flex-end' | 'center' | 'space-between' | 'space-around' | 'space-evenly';
   alignItems?: 'flex-start' | 'flex-end' | 'center' | 'stretch' | 'baseline';
-  flexBasis?: string; // For column widths
-  // New Styling Features
+  flexWrap?: 'nowrap' | 'wrap' | 'wrap-reverse';
+  // Flex Child
+  flexBasis?: string;
+  flexGrow?: string;
+  flexShrink?: string;
+  alignSelf?: 'auto' | 'flex-start' | 'flex-end' | 'center' | 'stretch' | 'baseline';
+  order?: string;
+  // Grid Container
+  gridTemplateColumns?: string;
+  gridTemplateRows?: string;
+  gridColumnGap?: string;
+  gridRowGap?: string;
+  // Grid Child
+  gridColumnStart?: string;
+  gridColumnEnd?: string;
+  gridRowStart?: string;
+  gridRowEnd?: string;
+  // Positioning
+  position?: 'static' | 'relative' | 'absolute' | 'fixed' | 'sticky';
+  top?: string;
+  right?: string;
+  bottom?: string;
+  left?: string;
+  zIndex?: string;
+  // Effects & Misc
   boxShadow?: string;
+  opacity?: string;
+  overflow?: 'visible' | 'hidden' | 'scroll' | 'auto';
+  cursor?: string;
   filter?: string; // For image filters
+  transform?: string;
+  transformOrigin?: string;
+  transition?: string;
   aspectRatio?: string;
   objectFit?: 'cover' | 'contain' | 'fill' | 'none' | 'scale-down';
+  objectPosition?: string;
 }
+
 
 export type ResponsiveStyles = {
     desktop: StyleProperties;
@@ -54,6 +129,7 @@ export type ResponsiveStyles = {
 interface StructureNode<T extends string> {
   id: string;
   type: T;
+  customName?: string; // For layer renaming
   styles: ResponsiveStyles;
   hoverStyles?: ResponsiveStyles; // For hover effects
   animation?: 'none' | 'fadeIn' | 'slideInUp';
@@ -61,13 +137,15 @@ interface StructureNode<T extends string> {
   visibility?: { // To hide on specific devices
       [key in Device]?: boolean;
   };
+  customCss?: string;
+  globalStyles?: string[]; // Array of global style IDs
 }
 
 // CONTENT ELEMENT TYPES
-export type ElementType = 'headline' | 'text' | 'image' | 'button' | 'spacer' | 'icon' | 'video' | 'form' | 'embed' | 'navigation' | 'gallery' | 'divider' | 'map';
+export type ElementType = 'headline' | 'text' | 'image' | 'button' | 'spacer' | 'icon' | 'video' | 'form' | 'embed' | 'navigation' | 'gallery' | 'divider' | 'map' | 'accordion' | 'tabs' | 'socialIcons';
 
 export interface HeadlineElement extends StructureNode<'headline'> {
-  content: { text: string; level: 'h1' | 'h2' | 'h3' };
+  content: { text: string; level: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' };
 }
 export interface TextElement extends StructureNode<'text'> {
   content: { text: string };
@@ -106,9 +184,37 @@ export interface MapElement extends StructureNode<'map'> {
     content: { embedUrl: string };
 }
 
+// NEW Elements
+export interface AccordionElement extends StructureNode<'accordion'> {
+    content: {
+        items: {
+            id: string;
+            title: string;
+            content: string;
+        }[];
+    };
+}
+export interface TabsElement extends StructureNode<'tabs'> {
+    content: {
+        items: {
+            id: string;
+            title: string;
+            content: Element[];
+        }[];
+    };
+}
+export interface SocialIconsElement extends StructureNode<'socialIcons'> {
+    content: {
+        networks: {
+            id: string;
+            network: 'facebook' | 'twitter' | 'instagram' | 'linkedin' | 'youtube';
+            url: string;
+        }[];
+    };
+}
 
 
-export type Element = HeadlineElement | TextElement | ImageElement | ButtonElement | SpacerElement | IconElement | VideoElement | FormElement | EmbedElement | NavigationElement | GalleryElement | DividerElement | MapElement;
+export type Element = HeadlineElement | TextElement | ImageElement | ButtonElement | SpacerElement | IconElement | VideoElement | FormElement | EmbedElement | NavigationElement | GalleryElement | DividerElement | MapElement | AccordionElement | TabsElement | SocialIconsElement;
 
 // LAYOUT STRUCTURE TYPES
 export interface Column extends StructureNode<'column'> {
@@ -124,27 +230,32 @@ export interface Section extends StructureNode<'section'> {
 // Combined type for any node in the structure tree
 export type WebsiteNode = Section | Row | Column | Element;
 
-// NEW: Page Structure
+// Page Structure
 export interface Page {
   id: string;
   name: string;
   slug: string;
   isHomepage: boolean;
+  isDraft?: boolean; // To hide from published site
+  password?: string; // For password protection
   heroImageUrl: string;
   tagline: string;
   metaTitle?: string;
   metaDescription?: string;
+  ogImageUrl?: string; // Social sharing image
+  customHeadCode?: string; // Per-page custom code
   children: Section[];
 }
 
-// UPDATED: TOP-LEVEL WEBSITE DATA
+// TOP-LEVEL WEBSITE DATA
 export interface WebsiteData {
   id: string;
   name: string;
   theme: Theme;
   faviconUrl?: string;
-  googleFont?: string; // For Google Fonts
-  customCursor?: string; // For custom cursors
+  googleFont?: string;
+  customCursor?: string;
+  customHeadCode?: string; // Site-wide custom code
   header: Section[]; // Global Header
   footer: Section[]; // Global Footer
   palette: {
@@ -153,6 +264,11 @@ export interface WebsiteData {
       text: string;
       accent: string;
   };
+  globalStyles?: {
+      colors: GlobalColor[];
+      typography: GlobalTypography[];
+  };
+  assets: { id: string, name: string, url: string }[];
   pages: Page[];
 }
 
@@ -168,7 +284,6 @@ export interface ThemeConfig {
   headerText: string;
 }
 
-// FIX: Moved from App.tsx to break circular dependency.
 export interface Session {
     isAuthenticated: boolean;
     type: 'admin' | 'user' | null;

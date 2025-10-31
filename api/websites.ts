@@ -1,6 +1,7 @@
 
 
 
+
 // Vercel Serverless Function
 import { kv } from '@vercel/kv';
 import { v4 as uuidv4 } from 'uuid';
@@ -64,6 +65,11 @@ const createDefaultWebsite = (id: string, name: string): WebsiteData => {
         secondary: '#f1f5f9',
         text: '#334155',
         accent: '#0ea5e9',
+    },
+    assets: [],
+    globalStyles: {
+        colors: [],
+        typography: [],
     },
     pages: [homePage]
   };

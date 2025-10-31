@@ -1,5 +1,6 @@
 
 
+
 // Vercel Serverless Function
 // This function retrieves website data from Vercel KV by its slug.
 import { kv } from '@vercel/kv';
@@ -36,6 +37,17 @@ export default async function handler(request: Request) {
     const rawData = await kv.get<{ site: WebsiteData, page: Page }>(key);
     
     if (rawData && rawData.site && rawData.page) {
+        // NEW: Check for password protection
+        if (rawData.page.password) {
+            const providedPassword = request.headers.get('x-password');
+            if (providedPassword !== rawData.page.password) {
+                return new Response(JSON.stringify({ passwordRequired: true }), { 
+                    status: 200, // Send 200 so frontend can handle it
+                    headers: { 'Content-Type': 'application/json' } 
+                });
+            }
+        }
+
         return new Response(JSON.stringify(rawData), { 
             status: 200, 
             headers: { 'Content-Type': 'application/json' } 

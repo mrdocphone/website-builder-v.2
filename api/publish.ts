@@ -1,4 +1,5 @@
 
+
 // Vercel Serverless Function
 import { kv } from '@vercel/kv';
 import type { WebsiteData } from '../types';
@@ -24,29 +25,25 @@ export default async function handler(request: Request) {
         
         // Get the state of the website before this publish event
         const oldWebsiteData = await kv.get<WebsiteData>(editorDataKey);
-        const oldSlugs = new Set(oldWebsiteData?.pages.map(p => p.slug) || []);
-        const newSlugs = new Set(websiteData.pages.map(p => p.slug));
+        const oldPublishedSlugs = new Set(oldWebsiteData?.pages.filter(p => !p.isDraft).map(p => p.slug) || []);
+        
+        const publishablePages = websiteData.pages.filter(p => !p.isDraft);
+        const newPublishedSlugs = new Set(publishablePages.map(p => p.slug));
 
         const pipeline = kv.pipeline();
 
-        // 1. Process all pages in the new data
-        let homepage = websiteData.pages.find(p => p.isHomepage);
-        if (!homepage && websiteData.pages.length > 0) {
-            // Fallback: if no page is set as homepage, set the first one.
-            homepage = websiteData.pages[0];
-            homepage.isHomepage = true;
+        // 1. Process all publishable pages
+        let homepage = publishablePages.find(p => p.isHomepage);
+        if (!homepage && publishablePages.length > 0) {
+            homepage = publishablePages[0];
+            // Do not mutate original data, but ensure the homepage logic works
         }
 
-        for (const page of websiteData.pages) {
+        for (const page of publishablePages) {
             const safeSlug = page.slug.toLowerCase().replace(/[^a-z0-9-]/g, '');
-            if (!safeSlug) continue; // Skip pages with empty slugs
+            if (!safeSlug) continue;
 
             const pageKey = `site:${safeUsername}/${safeSlug}`;
-            
-            // Uniqueness check: This is complex in a multi-page context. 
-            // For now, we assume slugs are unique within a site, managed by the editor.
-            // A more robust check would scan all keys, but that's slow.
-
             pipeline.set(pageKey, JSON.stringify({ site: websiteData, page }));
         }
 
@@ -54,13 +51,15 @@ export default async function handler(request: Request) {
         if (homepage) {
             const mainKey = `site:${safeUsername}`;
             pipeline.set(mainKey, JSON.stringify({ site: websiteData, page: homepage }));
+        } else {
+             // If there are no publishable pages, delete the root entry
+            pipeline.del(`site:${safeUsername}`);
         }
 
-        // 3. Delete pages that existed before but are no longer in the new data
-        for (const oldSlug of oldSlugs) {
-            // FIX: Add a type guard to ensure oldSlug is a string before using string methods.
+        // 3. Delete pages that were published before but are no longer
+        for (const oldSlug of oldPublishedSlugs) {
             if (typeof oldSlug !== 'string') continue;
-            if (!newSlugs.has(oldSlug)) {
+            if (!newPublishedSlugs.has(oldSlug)) {
                 const safeOldSlug = oldSlug.toLowerCase().replace(/[^a-z0-9-]/g, '');
                 const keyToDelete = `site:${safeUsername}/${safeOldSlug}`;
                 pipeline.del(keyToDelete);
