@@ -6,7 +6,6 @@ import {
     LogoutIcon, PencilIcon, LinkIcon, PlusIcon, TrashIcon, DuplicateIcon, 
     MoreVerticalIcon, GlobeIcon, SettingsIcon, CheckCircleIcon, CloudOffIcon, 
     SearchIcon, GridIcon, ListIcon, SunIcon, MoonIcon, TrendingUpIcon, TagIcon,
-    // FIX: Added missing import for `UsersIcon`.
     UsersIcon
 } from './icons';
 
@@ -19,7 +18,6 @@ const WebsiteDashboard: React.FC<{ onLogout: () => void, session: Session }> = (
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     
-    // New state for features
     const [viewMode, setViewMode] = useState<ViewMode>('grid');
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState<'all' | 'published' | 'draft'>('all');
@@ -36,7 +34,6 @@ const WebsiteDashboard: React.FC<{ onLogout: () => void, session: Session }> = (
             const res = await fetch(`/api/websites?username=${session.username}`);
             if (res.ok) {
                 const data = await res.json();
-                // Add mock data for UI demonstration
                 const dataWithMocks = data.map((site: WebsiteData) => ({
                     ...site,
                     analytics: {
@@ -88,7 +85,18 @@ const WebsiteDashboard: React.FC<{ onLogout: () => void, session: Session }> = (
     
     const handleAction = async (action: 'duplicate' | 'delete' | 'unpublish', website: WebsiteData) => {
         if (action === 'duplicate' && session.username) {
-            // ... (duplicate logic)
+             if (window.confirm(`Are you sure you want to duplicate "${website.name}"?`)) {
+                try {
+                    const res = await fetch('/api/websites', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ duplicateWebsiteId: website.id, username: session.username })
+                    });
+                    if (res.ok) {
+                        await fetchWebsites(); // Refresh list to show duplicated site
+                    } else { throw new Error('Failed to duplicate'); }
+                } catch (e) { alert("An error occurred while duplicating the website."); }
+            }
         } else if (action === 'delete') {
             if (window.confirm(`Are you sure you want to delete "${website.name}"? This cannot be undone.`)) {
                 try {
@@ -190,7 +198,6 @@ const WebsiteDashboard: React.FC<{ onLogout: () => void, session: Session }> = (
                     </button>
                 </div>
 
-                {/* Filters and Controls */}
                 <div className="mt-6 flex flex-wrap gap-2 items-center">
                     <div className="relative flex-grow sm:flex-grow-0 sm:w-64">
                         <SearchIcon className="w-5 h-5 text-gray-400 absolute top-1/2 left-3 transform -translate-y-1/2"/>

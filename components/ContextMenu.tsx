@@ -1,5 +1,5 @@
 import React from 'react';
-import { DuplicateIcon, TrashIcon, CopyIcon, PasteIcon, LockIcon, UnlockIcon } from './icons';
+import { DuplicateIcon, TrashIcon, CopyIcon, PasteIcon, LockIcon, UnlockIcon, ColumnIcon } from './icons';
 import type { WebsiteNode } from '../types';
 
 interface ContextMenuProps {
@@ -72,8 +72,14 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
       </button>
       <button onClick={() => handleAction(onDelete)} className="context-menu-item danger flex items-center px-3 py-1.5 hover:bg-red-50 text-red-600">
         <TrashIcon className="w-4 h-4 mr-2" />
-        Delete
+        Delete {node.type}
       </button>
+      {node.type === 'column' && (
+         <button onClick={() => handleAction(onDelete)} className="context-menu-item danger flex items-center px-3 py-1.5 hover:bg-red-50 text-red-600">
+            <ColumnIcon className="w-4 h-4 mr-2" />
+            Delete Column
+        </button>
+      )}
     </div>
   );
 };

@@ -1,23 +1,9 @@
-
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
-import type { WebsiteData, Page, WebsiteNode } from '../types';
+import type { WebsiteData, Page } from '../types';
 import Preview from './Preview';
+import { useDynamicStyles } from '../hooks/useDynamicStyles';
 
-
-// Helper to recursively find all nodes with hover styles
-const findHoverStyles = (nodes: WebsiteNode[]): { id: string; styles: any }[] => {
-    let styles: { id: string; styles: any }[] = [];
-    for (const node of nodes) {
-        if (node.hoverStyles) {
-            styles.push({ id: node.id, styles: node.hoverStyles });
-        }
-        if ('children' in node && Array.isArray(node.children)) {
-            styles = styles.concat(findHoverStyles(node.children as WebsiteNode[]));
-        }
-    }
-    return styles;
-};
 
 const PasswordPrompt: React.FC<{ onSubmit: (password: string) => void; hasError: boolean; }> = ({ onSubmit, hasError }) => {
     const [password, setPassword] = useState('');
@@ -46,13 +32,15 @@ const PasswordPrompt: React.FC<{ onSubmit: (password: string) => void; hasError:
 
 const PublishedWebsite: React.FC = () => {
   const { username, slug } = useParams<{ username: string; slug?: string }>();
-  // The API now returns the full WebsiteData object which includes the specific page data.
   const [websiteData, setWebsiteData] = useState<WebsiteData | null>(null);
   const [pageData, setPageData] = useState<Page | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [passwordRequired, setPasswordRequired] = useState(false);
   const [passwordError, setPasswordError] = useState(false);
+
+  // FIX: Use the new centralized hook for style parity.
+  const dynamicStyles = useDynamicStyles(websiteData, pageData);
 
   const fetchWebsiteData = useCallback(async (password?: string) => {
       if (!username) {
@@ -90,7 +78,7 @@ const PublishedWebsite: React.FC = () => {
 
           if (parsedData.passwordRequired) {
               setPasswordRequired(true);
-              if (password) { // If a password was provided and it's still required, it was wrong.
+              if (password) {
                   setPasswordError(true);
               }
           } else {
@@ -150,7 +138,6 @@ const PublishedWebsite: React.FC = () => {
         }
         favicon.setAttribute('href', websiteData.faviconUrl || '/favicon.ico');
         
-        // Google Font
         if (websiteData.googleFont) {
             const fontLink = document.getElementById('google-font-link') as HTMLLinkElement;
             if (fontLink) {
@@ -158,39 +145,18 @@ const PublishedWebsite: React.FC = () => {
             }
         }
         
-        // Custom Head Code
         if (websiteData.customHeadCode || pageData.customHeadCode) {
             const code = (websiteData.customHeadCode || '') + (pageData.customHeadCode || '');
             const scriptEl = document.createElement('div');
             scriptEl.innerHTML = code;
             Array.from(scriptEl.children).forEach(child => document.head.appendChild(child.cloneNode(true)));
         }
-         // Custom Body Code
         if (pageData.customBodyCode) {
             const bodyDiv = document.createElement('div');
             bodyDiv.innerHTML = pageData.customBodyCode;
             Array.from(bodyDiv.children).forEach(child => document.body.appendChild(child.cloneNode(true)));
         }
     }
-  }, [websiteData, pageData]);
-  
-   const dynamicStyles = useMemo(() => {
-    if (!websiteData) return '';
-    const hoverNodes = [
-      ...findHoverStyles(websiteData.header),
-      ...(pageData ? findHoverStyles(pageData.children) : []),
-      ...findHoverStyles(websiteData.footer),
-    ];
-
-    const desktopStyles = hoverNodes.map(({ id, styles }) => `[data-node-id="${id}"]:hover { ${Object.entries(styles.desktop).map(([k, v]) => `${k.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`)}: ${v};`).join(' ')} }`).join('\n');
-    const tabletStyles = hoverNodes.map(({ id, styles }) => `[data-node-id="${id}"]:hover { ${Object.entries(styles.tablet).map(([k, v]) => `${k.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`)}: ${v};`).join(' ')} }`).join('\n');
-    const mobileStyles = hoverNodes.map(({ id, styles }) => `[data-node-id="${id}"]:hover { ${Object.entries(styles.mobile).map(([k, v]) => `${k.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`)}: ${v};`).join(' ')} }`).join('\n');
-
-    return `
-      ${desktopStyles}
-      @media (max-width: 768px) { ${tabletStyles} }
-      @media (max-width: 375px) { ${mobileStyles} }
-    `;
   }, [websiteData, pageData]);
   
   useEffect(() => {
@@ -201,7 +167,6 @@ const PublishedWebsite: React.FC = () => {
   }, [dynamicStyles]);
 
 
-  // Animation effect for published site
   useEffect(() => {
     if (!isLoading && websiteData) {
       const observer = new IntersectionObserver((entries) => {

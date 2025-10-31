@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import type { WebsiteNode, Device, StyleProperties, Element, IconElement, WebsiteData, FormElement, EmbedElement, GalleryElement, SocialIconsElement, FormField, VideoElement, AccordionElement, TabsElement } from '../types';
+import type { WebsiteNode, Device, StyleProperties, Element, IconElement, WebsiteData, FormElement, EmbedElement, GalleryElement, SocialIconsElement, FormField, VideoElement, AccordionElement, TabsElement, Row, Column } from '../types';
 import { availableIcons, IconRenderer, DesktopIcon, TabletIcon, MobileIcon, EyeIcon, EyeSlashIcon, PlusIcon, TrashIcon, DragHandleIcon, PencilIcon, GridIcon, AnimationIcon, CheckboxIcon, SelectIcon, TextColorIcon, LayoutIcon } from './icons';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -11,6 +11,74 @@ interface StylePanelProps {
   onOpenAssetManager: () => void;
   onSelectNode: (id: string) => void;
 }
+
+const ColorPicker: React.FC<{ label: string, value: string | undefined, onChange: (value: string) => void, globalColors: WebsiteData['globalStyles']['colors'] }> = ({ label, value, onChange, globalColors }) => {
+    const varName = value?.match(/var\(--(.*?)\)/)?.[1];
+    const isGlobal = !!varName;
+    const globalColor = globalColors.find(c => c.name.toLowerCase().replace(/\s+/g, '-') === varName);
+    
+    return (
+        <div className="mb-2">
+            <div className="flex items-center justify-between">
+                <label className="text-sm text-slate-500 block">{label}</label>
+                <div className="flex items-center gap-2 border rounded-md p-1">
+                    <input type="color" value={isGlobal ? globalColor?.value : value || '#000000'} onChange={e => onChange(e.target.value)} className="w-6 h-6 p-0 border-none bg-transparent" />
+                    <input type="text" value={value || ''} onChange={e => onChange(e.target.value)} className="w-24 border-none text-sm p-0 focus:ring-0" placeholder="#000000"/>
+                </div>
+            </div>
+            {globalColors.length > 0 && <div className="global-color-swatches">
+                {globalColors.map(color => (
+                    <div key={color.id}
+                        onClick={() => onChange(`var(--${color.name.toLowerCase().replace(/\s+/g, '-')})`)}
+                        className={`global-color-swatch ${isGlobal && globalColor?.id === color.id ? 'selected' : ''}`}
+                        style={{ backgroundColor: color.value }}
+                        title={color.name}
+                    />
+                ))}
+            </div>}
+        </div>
+    );
+};
+
+const BackgroundPicker: React.FC<{
+    value: StyleProperties,
+    onChange: (prop: keyof StyleProperties, value: string) => void,
+    globalColors: WebsiteData['globalStyles']['colors'],
+    onOpenAssetManager: () => void,
+}> = ({ value, onChange, globalColors, onOpenAssetManager }) => {
+    const [type, setType] = useState<'color' | 'image'>(value.backgroundImage ? 'image' : 'color');
+    const color = value.backgroundColor || '';
+    const image = value.backgroundImage || '';
+
+    const handleColorChange = (newColor: string) => {
+        onChange('backgroundColor', newColor);
+        onChange('backgroundImage', '');
+    };
+    
+    const handleImageClick = () => {
+        onOpenAssetManager();
+    }
+
+    return (
+        <div className="background-picker">
+            <div className="background-picker-tabs">
+                <button onClick={() => setType('color')} className={`background-picker-tab ${type === 'color' ? 'active' : ''}`}>Color</button>
+                <button onClick={() => setType('image')} className={`background-picker-tab ${type === 'image' ? 'active' : ''}`}>Image</button>
+            </div>
+            <div className="p-4">
+                {type === 'color' ? (
+                    <ColorPicker label="Background Color" value={color} onChange={handleColorChange} globalColors={globalColors} />
+                ) : (
+                    <div>
+                        <button onClick={handleImageClick} className="w-full p-2 border rounded text-sm mb-2">Choose Image</button>
+                        {image && <div className="text-xs text-slate-500 truncate">Current: {image}</div>}
+                    </div>
+                )}
+            </div>
+        </div>
+    )
+}
+
 
 const StyleInput: React.FC<{
     label: string;
@@ -73,7 +141,6 @@ const StylePanel: React.FC<StylePanelProps> = ({ node, nodePath, websiteData, on
     const [editingDevice, setEditingDevice] = useState<Device>('desktop');
     const [editState, setEditState] = useState<'normal' | 'hover'>('normal');
     
-    // State for form field drag-and-drop
     const draggedField = useRef<number | null>(null);
     const [dragOverField, setDragOverField] = useState<number | null>(null);
     
@@ -93,10 +160,26 @@ const StylePanel: React.FC<StylePanelProps> = ({ node, nodePath, websiteData, on
         onUpdate(node.id, { content: { ...(node as any).content, [field]: value } });
     };
 
+    const handleLayoutChange = (layout: number[]) => {
+        const row = node as Row;
+        const newColumns: Column[] = layout.map((flexValue, i) => {
+            const existingCol = row.children[i];
+            const basis = `${(flexValue / layout.reduce((a, b) => a + b, 0)) * 100}%`;
+            if (existingCol) {
+                return { ...existingCol, styles: { ...existingCol.styles, desktop: { ...existingCol.styles.desktop, flexBasis: basis } } };
+            }
+            return { id: uuidv4(), type: 'column', styles: { desktop: { flexBasis: basis }, tablet: {}, mobile: {} }, children: [] };
+        });
+
+        onUpdate(node.id, { children: newColumns });
+    };
+
     const currentStylesForEditing = (editState === 'normal' ? node.styles : node.hoverStyles)?.[editingDevice] || {};
     const content = (node as any).content || {};
     const deviceOptions: { id: Device; icon: React.FC<any> }[] = [ { id: 'desktop', icon: DesktopIcon }, { id: 'tablet', icon: TabletIcon }, { id: 'mobile', icon: MobileIcon }, ];
     const isContainer = ['section', 'row', 'column'].includes(node.type);
+    
+    const layouts = [[1], [1, 1], [1, 2], [2, 1], [1, 1, 1], [1, 1, 2]];
 
     const renderContentFields = () => {
         switch (node.type) {
@@ -137,32 +220,29 @@ const StylePanel: React.FC<StylePanelProps> = ({ node, nodePath, websiteData, on
             }
             case 'form': {
                 const fields = (node as FormElement).content.fields || [];
-                const handleFieldDrop = (targetIndex: number) => {
-                    if (draggedField.current === null) return;
-                    const newFields = [...fields];
-                    const [removed] = newFields.splice(draggedField.current, 1);
-                    newFields.splice(targetIndex, 0, removed);
-                    handleContentChange('fields', newFields);
-                    draggedField.current = null;
-                    setDragOverField(null);
-                };
+                const handleFieldChange = (index: number, fieldUpdate: Partial<FormField>) => handleContentChange('fields', fields.map((f, i) => i === index ? { ...f, ...fieldUpdate } : f));
+                const handleRemoveField = (index: number) => handleContentChange('fields', fields.filter((_, i) => i !== index));
+                const handleDragStart = (e: React.DragEvent, index: number) => { draggedField.current = index; e.dataTransfer.effectAllowed = 'move'; };
+                const handleDragOver = (e: React.DragEvent, index: number) => { e.preventDefault(); if (draggedField.current !== index) setDragOverField(index); };
+                const handleDrop = () => { if (draggedField.current !== null && dragOverField !== null) { const newFields = [...fields]; const [draggedItem] = newFields.splice(draggedField.current, 1); newFields.splice(dragOverField, 0, draggedItem); handleContentChange('fields', newFields); } draggedField.current = null; setDragOverField(null); };
+
                  return (<div>
+                     <StyleInput label="Button Text" value={content.buttonText || 'Submit'} onChange={val => handleContentChange('buttonText', val)} />
+                     <hr className="my-4"/>
+                     <h4 className="font-semibold text-sm mb-2">Form Fields</h4>
+                    <div onDrop={handleDrop} onDragLeave={() => setDragOverField(null)}>
                     {fields.map((field, index) => (
-                        <div 
-                            key={field.id}
-                            draggable
-                            onDragStart={() => draggedField.current = index}
-                            onDrop={() => handleFieldDrop(index)}
-                            onDragOver={(e) => { e.preventDefault(); setDragOverField(index); }}
-                            onDragLeave={() => setDragOverField(null)}
-                            className={`p-2 border rounded mb-2 flex items-start gap-2 ${dragOverField === index ? 'bg-indigo-50' : ''}`}>
-                            <DragHandleIcon className="w-5 h-5 text-slate-400 cursor-grab mt-1" />
-                            <div className="flex-grow">
-                                <input value={field.label} onChange={e => handleContentChange('fields', fields.map((f, i) => i === index ? {...f, label: e.target.value} : f))} className="w-full p-1 border rounded text-sm mb-1" placeholder="Field Label"/>
-                            </div>
+                        <div key={field.id} draggable onDragStart={e => handleDragStart(e, index)} onDragOver={e => handleDragOver(e, index)} className={`p-3 border rounded mb-2 bg-white space-y-2 relative ${draggedField.current === index ? 'opacity-50' : ''}`}>
+                            {dragOverField === index && <div className="absolute inset-x-0 top-0 h-1 bg-indigo-400"></div>}
+                            <div className="flex justify-between items-center"><span className="font-medium text-sm">Field {index + 1}</span><button onClick={() => handleRemoveField(index)} className="p-1 hover:bg-red-50 rounded"><TrashIcon className="w-4 h-4 text-red-500"/></button></div>
+                            <StyleInput label="Type" value={field.type} onChange={val => handleFieldChange(index, { type: val })} type="select" options={[{value:'text',label:'Text'},{value:'email',label:'Email'},{value:'textarea',label:'Text Area'},{value:'checkbox',label:'Checkbox'},{value:'select',label:'Select'}]}/>
+                            <StyleInput label="Label" value={field.label} onChange={val => handleFieldChange(index, { label: val })} /><StyleInput label="Placeholder" value={field.placeholder} onChange={val => handleFieldChange(index, { placeholder: val })} />
+                            {field.type === 'select' && ( <div> <label className="text-sm text-slate-500 block mb-1">Options</label> <input type="text" value={field.options?.join(', ') || ''} onChange={e => handleFieldChange(index, { options: e.target.value.split(',').map(s => s.trim())})} placeholder="Option 1, Option 2" className="w-full p-1 border rounded text-sm"/> </div> )}
+                             <label className="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" checked={!!field.required} onChange={e => handleFieldChange(index, { required: e.target.checked })} /> Required</label>
                         </div>
                     ))}
-                    <button onClick={() => handleContentChange('fields', [...fields, {id: uuidv4(), type: 'text', label: 'New Field'}])} className="text-indigo-600 text-sm font-semibold flex items-center gap-1"><PlusIcon className="w-4 h-4"/> Add Field</button>
+                    </div>
+                    <button onClick={() => handleContentChange('fields', [...fields, {id: uuidv4(), type: 'text', label: 'New Field'}])} className="mt-2 text-indigo-600 text-sm font-semibold flex items-center gap-1"><PlusIcon className="w-4 h-4"/> Add Field</button>
                  </div>)
             }
             default: return <p className="text-sm text-center text-slate-400 p-4">No content to edit.</p>;
@@ -182,7 +262,16 @@ const StylePanel: React.FC<StylePanelProps> = ({ node, nodePath, websiteData, on
             </div>
             
              <div className="space-y-px">
-                <Accordion title="Content">{renderContentFields()}</Accordion>
+                {node.type !== 'row' && <Accordion title="Content">{renderContentFields()}</Accordion>}
+                {node.type === 'row' && <Accordion title="Layout" icon={LayoutIcon}>
+                    <div className="layout-picker">
+                        {layouts.map((layout, i) => (
+                            <button key={i} onClick={() => handleLayoutChange(layout)} className={`layout-option`}>
+                                {layout.map((flex, j) => <div key={j} className="col" style={{flexGrow: flex}}></div>)}
+                            </button>
+                        ))}
+                    </div>
+                </Accordion>}
                 {isContainer && <Accordion title="Layout" icon={LayoutIcon}>
                     <StyleInput label="Display" value={currentStylesForEditing.display} onChange={val => handleStyleChange('display', val)} type="select" options={[{value: 'flex', label: 'Flex'}, {value: 'grid', label: 'Grid'}, {value: 'block', label: 'Block'}]} />
                     {currentStylesForEditing.display === 'flex' && <>
@@ -190,13 +279,23 @@ const StylePanel: React.FC<StylePanelProps> = ({ node, nodePath, websiteData, on
                         <StyleInput label="Justify" value={currentStylesForEditing.justifyContent} onChange={val => handleStyleChange('justifyContent', val)} type="select" options={[{value: 'flex-start', label: 'Start'}, {value: 'center', label: 'Center'}, {value: 'flex-end', label: 'End'}, {value: 'space-between', label: 'Space Between'}]} />
                         <StyleInput label="Align" value={currentStylesForEditing.alignItems} onChange={val => handleStyleChange('alignItems', val)} type="select" options={[{value: 'flex-start', label: 'Start'}, {value: 'center', label: 'Center'}, {value: 'flex-end', label: 'End'}, {value: 'stretch', label: 'Stretch'}]} />
                     </>}
-                    {/* NEW: Grid controls */}
                     {currentStylesForEditing.display === 'grid' && <>
                         <StyleInput label="Columns" value={currentStylesForEditing.gridTemplateColumns} onChange={val => handleStyleChange('gridTemplateColumns', val)} placeholder="e.g. 1fr 1fr" />
                         <StyleInput label="Rows" value={currentStylesForEditing.gridTemplateRows} onChange={val => handleStyleChange('gridTemplateRows', val)} placeholder="e.g. auto 1fr" />
                     </>}
                     <StyleInput label="Gap" value={currentStylesForEditing.gap} onChange={val => handleStyleChange('gap', val)} />
                 </Accordion>}
+                 <Accordion title="Typography">
+                    <ColorPicker label="Text Color" value={currentStylesForEditing.color} onChange={v => handleStyleChange('color', v)} globalColors={websiteData.globalStyles.colors} />
+                 </Accordion>
+                 <Accordion title="Background">
+                    <BackgroundPicker 
+                        value={currentStylesForEditing}
+                        onChange={handleStyleChange}
+                        globalColors={websiteData.globalStyles.colors}
+                        onOpenAssetManager={onOpenAssetManager}
+                    />
+                 </Accordion>
                  <Accordion title="Spacing">
                      <FourSidedControl label="Margin" values={{Top: currentStylesForEditing.marginTop, Bottom: currentStylesForEditing.marginBottom, Left: currentStylesForEditing.marginLeft, Right: currentStylesForEditing.marginRight}} onChange={(s,v) => handleStyleChange(`margin${s}` as any, v)}/>
                      <FourSidedControl label="Padding" values={{Top: currentStylesForEditing.paddingTop, Bottom: currentStylesForEditing.paddingBottom, Left: currentStylesForEditing.paddingLeft, Right: currentStylesForEditing.paddingRight}} onChange={(s,v) => handleStyleChange(`padding${s}` as any, v)}/>

@@ -2,19 +2,21 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { produce } from 'immer';
 import { useParams, useNavigate } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
-import type { WebsiteData, WebsiteNode, Section, Session, ElementType, Device, ResponsiveStyles, Element, Page } from '../types';
-import { findNodeById, updateNodeById, removeNodeById, addNode, moveNode, duplicateNodeById, findNodePath, deepCloneWithNewIds, addNodeNextTo } from '../utils/tree';
+import type { WebsiteData, WebsiteNode, Section, Session, ElementType, Device, ResponsiveStyles, Element, Page, StyleProperties, Column } from '../types';
+// FIX: Removed `deepCloneWebsite` as it's not exported from the tree utility module.
+import { findNodeById, updateNodeById, removeNodeById, addNode, moveNode, duplicateNodeById, findNodePath, deepCloneWithNewIds, addNodeNextTo, findNodeAndParent } from '../utils/tree';
 import { generateSectionContent } from '../services/geminiService';
 import GlobalSettingsForm from './GlobalSettingsForm';
 import StylePanel from './SectionEditorForm';
 import Preview from './Preview';
 import PublishModal from './PublishModal';
-import { DesktopIcon, TabletIcon, MobileIcon, LayersIcon, PlusIcon as ComponentIcon, SettingsIcon, PencilIcon, TrashIcon, VideoIcon, StarIcon, CheckIcon, HeartIcon, UndoIcon, RedoIcon, CopyIcon, PasteIcon, FormIcon, EmbedIcon, MagicWandIcon, HomeIcon, PageSettingsIcon, DuplicateIcon, ColumnIcon, LockIcon, UnlockIcon, LayoutIcon, SunIcon, MoonIcon, CommandIcon, AssetIcon, WireframeIcon, HistoryIcon } from './icons';
+import { DesktopIcon, TabletIcon, MobileIcon, LayersIcon, PlusIcon as ComponentIcon, SettingsIcon, PencilIcon, TrashIcon, VideoIcon, StarIcon, CheckIcon, HeartIcon, UndoIcon, RedoIcon, CopyIcon, PasteIcon, FormIcon, EmbedIcon, MagicWandIcon, HomeIcon, PageSettingsIcon, DuplicateIcon, ColumnIcon, LockIcon, UnlockIcon, LayoutIcon, SunIcon, MoonIcon, CommandIcon, AssetIcon, WireframeIcon, HistoryIcon, PlusIcon, AlignTopIcon, AlignCenterVerticalIcon, AlignBottomIcon, DistributeVerticalIcon } from './icons';
 import ContextMenu from './ContextMenu';
 import SectionTemplatesPanel from './SectionTemplatesPanel';
 import PageSettingsModal from './PageSettingsModal';
 import AssetManager from './AssetManager';
-import LayerItem from './LayerItem';
+import PagesAndLayersPanel from './PagesAndLayersPanel';
+import { useDynamicStyles } from '../hooks/useDynamicStyles';
 
 type DropPosition = 'top' | 'bottom';
 type EditingContext = 'page' | 'header' | 'footer';
@@ -50,7 +52,6 @@ const useHistoryState = <T,>(initialState: T) => {
     }
 
     const undo = () => { if (currentIndex > 0) setCurrentIndex(prev => prev - 1); };
-    // BUGFIX: The redo function was incorrectly decrementing the index. Changed `prev - 1` to `prev + 1`.
     const redo = () => { if (currentIndex < history.length - 1) setCurrentIndex(prev => prev + 1); };
 
     return {
@@ -67,7 +68,6 @@ const useHistoryState = <T,>(initialState: T) => {
     };
 };
 
-// NEW: Debounce hook for performance optimization
 const useDebounce = <T,>(value: T, delay: number): T => {
     const [debouncedValue, setDebouncedValue] = useState<T>(value);
     useEffect(() => {
@@ -94,13 +94,13 @@ const EditorTopBar: React.FC<{
   onSetEditingContext: (context: EditingContext) => void;
   onPublish: () => void;
   isSaving: boolean;
-  lastSaved: Date | null;
+  saveStatus: string;
   onUndo: () => void;
   onRedo: () => void;
   canUndo: boolean;
   canRedo: boolean;
   onOpenCommandPalette: () => void;
-}> = ({ websiteName, device, editingContext, onSetDevice, onSetEditingContext, onPublish, isSaving, lastSaved, onUndo, onRedo, canUndo, canRedo, onOpenCommandPalette }) => {
+}> = ({ websiteName, device, editingContext, onSetDevice, onSetEditingContext, onPublish, isSaving, saveStatus, onUndo, onRedo, canUndo, canRedo, onOpenCommandPalette }) => {
   const navigate = useNavigate();
   const deviceOptions: { id: Device; icon: React.FC<any> }[] = [ { id: 'desktop', icon: DesktopIcon }, { id: 'tablet', icon: TabletIcon }, { id: 'mobile', icon: MobileIcon } ];
   return (
@@ -130,14 +130,13 @@ const EditorTopBar: React.FC<{
         </button>
       </div>
       <div className="flex items-center gap-4">
-        <div className="text-xs text-slate-500 h-4 min-w-[100px] text-right"> {isSaving ? 'Saving...' : lastSaved ? `Saved` : ''} </div>
+        <div className="text-xs text-slate-500 h-4 min-w-[100px] text-right"> {saveStatus} </div>
         <button onClick={onPublish} className="bg-indigo-600 text-white font-bold py-1.5 px-4 rounded-md text-sm hover:bg-indigo-700"> Publish </button>
       </div>
     </div>
   );
 };
 
-// ... LayersPanel, AddPanel etc ...
 const AddPanel: React.FC<{ onAddElement: (type: ElementType) => void }> = ({ onAddElement }) => {
   const elements: { type: ElementType, label: string, icon: React.FC<any> }[] = [ { type: 'headline', label: 'Headline', icon: PencilIcon }, { type: 'text', label: 'Text', icon: PencilIcon }, { type: 'button', label: 'Button', icon: PencilIcon }, { type: 'image', label: 'Image', icon: PencilIcon }, { type: 'spacer', label: 'Spacer', icon: CheckIcon }, { type: 'video', label: 'Video', icon: VideoIcon }, { type: 'icon', label: 'Icon', icon: StarIcon }, { type: 'form', label: 'Form', icon: FormIcon }, { type: 'embed', label: 'Embed', icon: EmbedIcon }, { type: 'navigation', label: 'Navigation', icon: MagicWandIcon }, { type: 'gallery', label: 'Gallery', icon: MagicWandIcon }, { type: 'divider', label: 'Divider', icon: MagicWandIcon }, { type: 'map', label: 'Map', icon: MagicWandIcon }, { type: 'accordion', label: 'Accordion', icon: MagicWandIcon }, { type: 'tabs', label: 'Tabs', icon: MagicWandIcon }, { type: 'socialIcons', label: 'Social Icons', icon: MagicWandIcon }];
   return ( <div className="add-element-grid"> {elements.map(el => ( <button key={el.type} onClick={() => onAddElement(el.type)} className="add-element-button"> <el.icon className="w-6 h-6" /> <span>{el.label}</span> </button> ))} </div> );
@@ -149,14 +148,19 @@ const AddPanel: React.FC<{ onAddElement: (type: ElementType) => void }> = ({ onA
 const Editor: React.FC<{session: Session}> = ({ session }) => {
   const { websiteId } = useParams<{ websiteId: string }>();
   const { state: websiteData, setState: setWebsiteData, setInitialState: setInitialWebsiteData, undo, redo, canUndo, canRedo, history, currentIndex, jumpToState } = useHistoryState<WebsiteData | null>(null);
-  const debouncedWebsiteData = useDebounce(websiteData, 1500);
+  const debouncedWebsiteData = useDebounce(websiteData, 2000);
+  const isInitialLoad = useRef(true);
   
   const [activePageId, setActivePageId] = useState<string | null>(null);
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
+  
+  // NEW: Refined saving state
   const [isSaving, setIsSaving] = useState(false);
-  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [isDirty, setIsDirty] = useState(false);
+  const [saveStatus, setSaveStatus] = useState('');
+
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'pages' | 'add' | 'templates' | 'style' | 'settings' | 'history'>('pages');
   const [device, setDevice] = useState<Device>('desktop');
@@ -171,6 +175,74 @@ const Editor: React.FC<{session: Session}> = ({ session }) => {
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isAssetManagerOpen, setIsAssetManagerOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'normal' | 'wireframe'>('normal');
+
+  const [draggedNodeId, setDraggedNodeId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<{ targetId: string; position: DropPosition } | null>(null);
+  
+  // NEW: State for alignment toolbar
+  const [alignmentToolbarState, setAlignmentToolbarState] = useState<{ top: number; left: number; width: number } | null>(null);
+
+  const activePage = websiteData?.pages.find(p => p.id === activePageId);
+  const dynamicStyles = useDynamicStyles(websiteData, activePage || null);
+
+  const contentTree = editingContext === 'page' ? activePage?.children : websiteData?.[editingContext];
+  const selectedNodes = selectedNodeIds.map(id => findNodeById(contentTree || [], id)).filter(Boolean) as WebsiteNode[];
+  const selectedNode = selectedNodes.length === 1 ? selectedNodes[0] : null;
+
+  // NEW: Save function
+  const handleSave = useCallback(async () => {
+    if (!isDirty || !websiteData) return;
+    setIsSaving(true);
+    setSaveStatus('Saving...');
+    try {
+        await fetch('/api/editor-data', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ websiteId, websiteData })
+        });
+        setIsDirty(false);
+        setSaveStatus(`Saved just now`);
+    } catch (e) {
+        console.error("Failed to save:", e);
+        setSaveStatus('Save failed');
+    } finally {
+        setIsSaving(false);
+        setTimeout(() => setSaveStatus(isDirty ? 'Unsaved changes' : 'All changes saved'), 2000);
+    }
+  }, [websiteId, websiteData, isDirty]);
+
+  // NEW: Autosave effect based on debounced data
+  useEffect(() => {
+    if (isInitialLoad.current) {
+        isInitialLoad.current = false;
+        return;
+    }
+    if (!debouncedWebsiteData || !isDirty) return;
+    handleSave();
+  }, [debouncedWebsiteData, handleSave, isDirty]);
+
+  // NEW: Manual save and unload listeners
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+        if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+            e.preventDefault();
+            handleSave();
+        }
+    };
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+        if (isDirty) {
+            e.preventDefault();
+            e.returnValue = ''; // Required for cross-browser support
+        }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+        window.removeEventListener('keydown', handleKeyDown);
+        window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [isDirty, handleSave]);
+
 
   useEffect(() => {
     const loadData = async () => {
@@ -195,13 +267,11 @@ const Editor: React.FC<{session: Session}> = ({ session }) => {
     loadData();
   }, [websiteId, setInitialWebsiteData]);
   
-  const handleCloseContextMenu = useCallback(() => {
-      setContextMenu(null);
-  }, []);
+  const handleCloseContextMenu = useCallback(() => setContextMenu(null), []);
 
   useEffect(() => {
       window.addEventListener('click', handleCloseContextMenu);
-      window.addEventListener('contextmenu', handleCloseContextMenu); // Close on another right-click
+      window.addEventListener('contextmenu', handleCloseContextMenu);
       return () => {
           window.removeEventListener('click', handleCloseContextMenu);
           window.removeEventListener('contextmenu', handleCloseContextMenu);
@@ -219,33 +289,15 @@ const Editor: React.FC<{session: Session}> = ({ session }) => {
         if (selectedNodeIds.length === 0) return;
         const selectedNodeId = selectedNodeIds[0];
 
-        // Delete node
         if (e.key === 'Delete' || e.key === 'Backspace') {
             const activeEl = document.activeElement;
-            if (activeEl?.hasAttribute('contenteditable') && activeEl?.getAttribute('contenteditable') === 'true') {
-                return; // Don't delete node if user is typing
-            }
+            if (activeEl?.hasAttribute('contenteditable') && activeEl?.getAttribute('contenteditable') === 'true') return;
             e.preventDefault();
             handleDeleteNode(selectedNodeId);
         }
-
-        // Duplicate node
-        if ((e.metaKey || e.ctrlKey) && e.key === 'd') {
-            e.preventDefault();
-            handleDuplicateNode(selectedNodeId);
-        }
-        
-        // Copy Node
-        if ((e.metaKey || e.ctrlKey) && e.key === 'c') {
-            e.preventDefault();
-            handleCopyNode(selectedNodeId);
-        }
-        
-        // Paste Node
-        if ((e.metaKey || e.ctrlKey) && e.key === 'v') {
-            e.preventDefault();
-            handlePasteNode(selectedNodeId);
-        }
+        if ((e.metaKey || e.ctrlKey) && e.key === 'd') { e.preventDefault(); handleDuplicateNode(selectedNodeId); }
+        if ((e.metaKey || e.ctrlKey) && e.key === 'c') { e.preventDefault(); handleCopyNode(selectedNodeId); }
+        if ((e.metaKey || e.ctrlKey) && e.key === 'v') { e.preventDefault(); handlePasteNode(selectedNodeId); }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
@@ -258,59 +310,55 @@ const Editor: React.FC<{session: Session}> = ({ session }) => {
       setContextMenu({ x: e.clientX, y: e.clientY, nodeId });
   };
   
-  const activePage = websiteData?.pages.find(p => p.id === activePageId);
-  const contentTree = editingContext === 'page' ? activePage?.children : websiteData?.[editingContext];
-  const selectedNode = contentTree && selectedNodeIds.length === 1 ? findNodeById(contentTree, selectedNodeIds[0]) : null;
-
-
-  // Debounced save effect
-  useEffect(() => {
-    // Do not save on initial load or if there's no data
-    if (!debouncedWebsiteData || history.length <= 1) return;
-
-    const performSave = async () => {
-        setIsSaving(true);
-        try {
-            await fetch('/api/editor-data', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ websiteId, websiteData: debouncedWebsiteData })
-            });
-            setLastSaved(new Date());
-        } catch (e) {
-            console.error("Failed to save:", e);
-        } finally {
-            setIsSaving(false);
-        }
-    };
-    performSave();
-  }, [debouncedWebsiteData, websiteId, history.length]);
-  
-  const handleUpdateNode = useCallback((id: string, updates: Partial<WebsiteNode>) => {
+  // Wrapped setState to handle dirty flag
+  const updateWebsiteData = (action: (draft: WebsiteData) => void | WebsiteData, message: string) => {
     setWebsiteData(draft => {
-        if (!draft) return;
+        if (draft) return action(draft) as any;
+    }, message);
+    setIsDirty(true);
+    setSaveStatus('Unsaved changes');
+  }
+
+  const handleUpdateNode = useCallback((id: string, updates: Partial<WebsiteNode>) => {
+    updateWebsiteData(draft => {
         const tree = editingContext === 'page' ? draft.pages.find(p => p.id === activePageId)?.children : draft[editingContext];
         if (tree) updateNodeById(tree, id, updates);
     }, `Update ${findNodeById(contentTree || [], id)?.type}`);
-  }, [setWebsiteData, activePageId, editingContext, contentTree]);
+  }, [activePageId, editingContext, contentTree]);
 
 
   const handleDeleteNode = useCallback((id: string) => {
-    setWebsiteData(draft => {
-        if (!draft) return;
-        const tree = editingContext === 'page' ? draft.pages.find(p => p.id === activePageId)?.children : draft[editingContext];
-        if (tree && removeNodeById(tree, id)) {
-            setSelectedNodeIds([]);
-            setActiveTab('pages');
+    let parentId: string | null = null;
+    const tree = contentTree || [];
+    const location = findNodeAndParent(tree, id);
+    if (!location) return;
+
+    if ('id' in location.parent) parentId = (location.parent as WebsiteNode).id;
+    
+    updateWebsiteData(draft => {
+        const currentTree = editingContext === 'page' ? draft.pages.find(p => p.id === activePageId)?.children : draft[editingContext];
+        if (currentTree && removeNodeById(currentTree, id)) {
+            setSelectedNodeIds(parentId ? [parentId] : []);
+             // After removing, if the deleted node was a column, resize siblings
+            // FIX: Added a type guard (`'type' in location.parent`) to ensure the parent is a WebsiteNode before accessing its `type` property.
+            if (location.node.type === 'column' && 'children' in location.parent && 'type' in location.parent && location.parent.type === 'row') {
+                const parentRow = findNodeById(currentTree, (location.parent as WebsiteNode).id) as any;
+                if (parentRow && parentRow.children.length > 0) {
+                    const basis = `${100 / parentRow.children.length}%`;
+                    parentRow.children.forEach((col: Column) => {
+                        if (!col.styles.desktop) col.styles.desktop = {};
+                        col.styles.desktop.flexBasis = basis;
+                    });
+                }
+            }
         }
     }, `Delete node`);
-  }, [setWebsiteData, activePageId, editingContext]);
+  }, [activePageId, editingContext, contentTree]);
 
   const handleAddElement = useCallback((type: ElementType) => {
     if (selectedNodeIds.length !== 1) { alert("Please select a single column to add the element to."); return; }
     
-    setWebsiteData(draft => {
-        if (!draft) return;
+    updateWebsiteData(draft => {
         let container: { children: WebsiteNode[] };
         if (editingContext === 'page') {
             const page = draft.pages.find(p => p.id === activePageId);
@@ -325,42 +373,15 @@ const Editor: React.FC<{session: Session}> = ({ session }) => {
         
         if (targetParentId) {
             addNode(container, targetParentId, type);
-            if (editingContext !== 'page') {
-                draft[editingContext] = container.children as Section[];
-            }
+            if (editingContext !== 'page') draft[editingContext] = container.children as Section[];
         } else {
             alert("Elements can only be added inside columns.");
         }
     }, `Add ${type} element`);
-  }, [selectedNodeIds, setWebsiteData, activePageId, editingContext]);
-  
-  const handleAddNode = useCallback((type: 'column' | 'section', parentId?: string) => {
-      setWebsiteData(draft => {
-          if (!draft) return;
-          let container: { children: WebsiteNode[] } & { id?: string };
-          if (editingContext === 'page') {
-            const page = draft.pages.find(p => p.id === activePageId);
-            if (!page) return;
-            container = page;
-          } else {
-            container = { children: draft[editingContext] };
-          }
-          
-          if (type === 'section') {
-             addNode(container, container.id || '', 'section');
-          } else if (type === 'column' && parentId) {
-              addNode(container, parentId, 'column');
-          }
-
-          if (editingContext !== 'page') {
-            draft[editingContext] = container.children as Section[];
-          }
-      }, `Add ${type}`);
-  }, [activePageId, setWebsiteData, editingContext]);
+  }, [selectedNodeIds, activePageId, editingContext]);
   
   const handleAddSection = useCallback((context: 'page' | 'header' | 'footer') => {
-      setWebsiteData(draft => {
-          if (!draft) return;
+      updateWebsiteData(draft => {
           const target = context === 'page' ? draft.pages.find(p => p.id === activePageId) : draft;
           if (!target) return;
           const newSection: Section = { id: uuidv4(), type: 'section', styles: { desktop: { paddingTop: '2rem', paddingBottom: '2rem'}, tablet: {}, mobile: {} }, children: [ { id: uuidv4(), type: 'row', styles: { desktop: {}, tablet: {}, mobile: {} }, children: [{ id: uuidv4(), type: 'column', styles: { desktop: {flexBasis: '100%'}, tablet: {}, mobile: {} }, children: [] }] } ] };
@@ -368,9 +389,10 @@ const Editor: React.FC<{session: Session}> = ({ session }) => {
           setSelectedNodeIds([newSection.id]);
           setActiveTab('style');
       }, `Add Section`);
-  }, [activePageId, setWebsiteData]);
+  }, [activePageId]);
 
   const handleSelectNode = useCallback((id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
     if (e.shiftKey) {
         setSelectedNodeIds(prev => prev.includes(id) ? prev.filter(nid => nid !== id) : [...prev, id]);
     } else {
@@ -380,256 +402,194 @@ const Editor: React.FC<{session: Session}> = ({ session }) => {
   }, []);
   
   const handleMoveNode = useCallback((sourceId: string, targetId: string, position: 'top' | 'bottom') => {
-      setWebsiteData(draft => {
-          if (!draft) return;
+      updateWebsiteData(draft => {
           const tree = editingContext === 'page' ? draft.pages.find(p => p.id === activePageId)?.children : draft[editingContext];
           if (tree) moveNode(tree, sourceId, targetId, position === 'top' ? 'before' : 'after');
       }, `Move Node`);
-  }, [editingContext, activePageId, setWebsiteData]);
+  }, [editingContext, activePageId]);
   
-  const handleCopyStyles = (nodeId: string) => {
-      if (!contentTree) return;
-      const node = findNodeById(contentTree, nodeId);
-      if (node) {
-          setCopiedStyles(node.styles);
-      }
-  };
-  
-  const handlePasteStyles = (nodeId: string) => {
-      if (copiedStyles) {
-          handleUpdateNode(nodeId, { styles: copiedStyles });
-      }
-  };
-  
-  const handleCopyNode = (nodeId: string) => {
-      if (!contentTree) return;
-      const node = findNodeById(contentTree, nodeId);
-      if (node) {
-          setCopiedNode(node);
-      }
-  };
+  const handleCopyStyles = (nodeId: string) => { if (contentTree) { const node = findNodeById(contentTree, nodeId); if (node) setCopiedStyles(node.styles); } };
+  const handlePasteStyles = (nodeId: string) => { if (copiedStyles) handleUpdateNode(nodeId, { styles: copiedStyles }); };
+  const handleCopyNode = (nodeId: string) => { if (contentTree) { const node = findNodeById(contentTree, nodeId); if (node) setCopiedNode(node); } };
+  const handlePasteNode = (targetNodeId: string) => { if (copiedNode) updateWebsiteData(draft => { const tree = editingContext === 'page' ? draft.pages.find(p => p.id === activePageId)?.children : draft[editingContext]; if (tree) addNodeNextTo(tree, targetNodeId, deepCloneWithNewIds(copiedNode), 'after'); }, `Paste Node`); };
+  const handleDuplicateNode = useCallback((nodeId: string) => updateWebsiteData(draft => { const tree = editingContext === 'page' ? draft.pages.find(p => p.id === activePageId)?.children : draft[editingContext]; if (tree) duplicateNodeById(tree, nodeId); }, `Duplicate node`), [editingContext, activePageId]);
+  const handleToggleLock = (nodeId: string) => { if (contentTree) { const node = findNodeById(contentTree, nodeId); if (node) handleUpdateNode(nodeId, { locked: !node.locked }); } }
+  const handleToggleVisibility = useCallback((nodeId: string) => { const node = findNodeById(contentTree || [], nodeId); if (node) { const currentVisibility = node.visibility || {}; const isVisible = currentVisibility[device] !== false; handleUpdateNode(nodeId, { visibility: { ...currentVisibility, [device]: !isVisible } }); } }, [contentTree, device, handleUpdateNode]);
 
-  const handlePasteNode = (targetNodeId: string) => {
-      if (!copiedNode) return;
-      setWebsiteData(draft => {
-          if (!draft) return;
-          const tree = editingContext === 'page' ? draft.pages.find(p => p.id === activePageId)?.children : draft[editingContext];
-          if (tree) {
-             const nodeToPaste = deepCloneWithNewIds(copiedNode);
-             addNodeNextTo(tree, targetNodeId, nodeToPaste, 'after');
-          }
-      }, `Paste Node`);
-  };
-  
-  const handleDuplicateNode = useCallback((nodeId: string) => {
-        setWebsiteData(draft => {
-          if (!draft) return;
-          const tree = editingContext === 'page' ? draft.pages.find(p => p.id === activePageId)?.children : draft[editingContext];
-          if (tree) duplicateNodeById(tree, nodeId);
-        }, `Duplicate node`);
-  }, [editingContext, activePageId, setWebsiteData]);
-  
-  const handleToggleLock = (nodeId: string) => {
-      if (!contentTree) return;
-      const node = findNodeById(contentTree, nodeId);
-      if (node) {
-          handleUpdateNode(nodeId, { locked: !node.locked });
-      }
-  }
+    // NEW: Page Management handlers
+    const handleCreatePage = () => {
+        const name = prompt("Enter new page name:", "New Page");
+        if (!name) return;
+        updateWebsiteData(draft => {
+            const newPage: Page = {
+                id: uuidv4(),
+                name,
+                slug: name.toLowerCase().replace(/\s+/g, '-'),
+                isHomepage: false,
+                children: [],
+                heroImageUrl: 'https://images.unsplash.com/photo-1487017159836-4e23ece2e4cf?q=80&w=2071&auto=format&fit=crop',
+                tagline: 'A brand new page'
+            };
+            draft.pages.push(newPage);
+            setActivePageId(newPage.id);
+            setSelectedNodeIds([]);
+        }, "Create Page");
+    };
 
-  const handleGenerateSectionContent = async (sectionId: string) => {
-      if (!websiteData || !activePage) return;
-      const sectionNode = findNodeById(contentTree || [], sectionId) as Section;
-      if (!sectionNode || sectionNode.type !== 'section') {
-          alert("Content can only be generated for a 'section'.");
-          return;
-      }
-      setGeneratingSectionId(sectionId);
-      try {
-          // BUGFIX: Pass `activePage.tagline` instead of non-existent `websiteData.tagline`
-          const generatedColumns = await generateSectionContent(websiteData, activePage.tagline, sectionNode);
-          handleUpdateNode(sectionId, { 
-              children: sectionNode.children.map((row, rowIndex) => ({
-                  ...row,
-                  children: row.children.map((col, colIndex) => ({
-                      ...col,
-                      children: generatedColumns[colIndex]?.map(el => ({
-                          id: uuidv4(),
-                          type: el.type,
-                          content: el.content,
-                          styles: { desktop: {}, tablet: {}, mobile: {} }
-                      })) || []
-                  }))
-              }))
-          });
-      } catch (e) {
-          console.error(e);
-          alert("Failed to generate AI content.");
-      } finally {
-          setGeneratingSectionId(null);
-      }
-  };
+    const handleDuplicatePage = (pageId: string) => {
+        updateWebsiteData(draft => {
+            const pageToDuplicate = draft.pages.find(p => p.id === pageId);
+            if (pageToDuplicate) {
+                const newPage = deepCloneWithNewIds(pageToDuplicate) as Page;
+                newPage.name = `${pageToDuplicate.name} (Copy)`;
+                newPage.slug = `${pageToDuplicate.slug}-copy`;
+                newPage.isHomepage = false; // Prevent duplicate homepages
+                draft.pages.push(newPage);
+                setActivePageId(newPage.id);
+                setSelectedNodeIds([]);
+            }
+        }, "Duplicate Page");
+    };
 
-  const handleUpdatePage = (pageId: string, updates: Partial<Page>) => {
-      setWebsiteData(draft => {
-          if (!draft) return;
-          const pageIndex = draft.pages.findIndex(p => p.id === pageId);
-          if (pageIndex !== -1) {
-              const oldPage = draft.pages[pageIndex];
-              draft.pages[pageIndex] = { ...oldPage, ...updates };
+    const handleDeletePage = (pageId: string) => {
+        if (!window.confirm("Are you sure you want to delete this page? This cannot be undone.")) return;
+        updateWebsiteData(draft => {
+            if (draft.pages.length <= 1) {
+                alert("You cannot delete the last page.");
+                return;
+            }
+            const index = draft.pages.findIndex(p => p.id === pageId);
+            if (index > -1) {
+                const wasHomepage = draft.pages[index].isHomepage;
+                draft.pages.splice(index, 1);
+                if (wasHomepage && draft.pages.length > 0) {
+                    draft.pages[0].isHomepage = true;
+                }
+                setActivePageId(draft.pages[0].id);
+                setSelectedNodeIds([]);
+            }
+        }, "Delete Page");
+    };
 
-              // If setting a page as homepage, unset all others
-              if (updates.isHomepage) {
-                  draft.pages.forEach((p, i) => {
-                      if (i !== pageIndex) p.isHomepage = false;
-                  });
-              }
-          }
-      }, `Update page ${updates.name || ''}`);
-  };
+    const handleOpenPageSettings = (pageId: string) => {
+        const page = websiteData?.pages.find(p => p.id === pageId);
+        if (page) setEditingPage(page);
+    };
 
-  const handleDuplicatePage = (pageId: string) => {
-      setWebsiteData(draft => {
-          if (!draft) return;
-          const pageToDuplicate = draft.pages.find(p => p.id === pageId);
-          if (pageToDuplicate) {
-              const newPage = { ...pageToDuplicate, id: uuidv4(), name: `${pageToDuplicate.name} Copy`, slug: `${pageToDuplicate.slug}-copy`, isHomepage: false };
-              draft.pages.push(newPage);
-          }
-      }, `Duplicate page`)
-  };
 
-  const handleRenameNode = (nodeId: string, newName: string) => {
-      handleUpdateNode(nodeId, { customName: newName });
-  };
-  
   const handleAiTextUpdate = async (nodeId: string, action: string, options?: { tone?: string }) => {
       if (!activePage) return;
       const node = findNodeById(contentTree || [], nodeId) as Element;
       if (!node || !('content' in node) || !('text' in node.content)) return;
-
-      const textContent = (node.content as any).text.replace(/<[^>]*>?/gm, '');
-
+      const htmlContent = (node.content as any).text;
       setIsAiLoading(true);
       try {
-          const res = await fetch('/api/ai-text', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ text: textContent, action, ...options })
-          });
+          const res = await fetch('/api/ai-text', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: htmlContent, action, ...options }) });
           const data = await res.json();
-          if (res.ok) {
-              handleUpdateNode(nodeId, { content: { ...node.content, text: data.newText }});
-          } else {
-              throw new Error(data.message || 'AI request failed');
-          }
-      } catch (e) {
-          alert(e instanceof Error ? e.message : 'An error occurred.');
-      } finally {
-          setIsAiLoading(false);
-      }
+          if (res.ok) handleUpdateNode(nodeId, { content: { ...node.content, text: data.newText }});
+          else throw new Error(data.message || 'AI request failed');
+      } catch (e) { alert(e instanceof Error ? e.message : 'An error occurred.'); } 
+      finally { setIsAiLoading(false); }
   }
 
+  // Drag & Drop Handlers
+  const handleDragStart = (e: React.DragEvent, nodeId: string) => { e.dataTransfer.effectAllowed = 'move'; setDraggedNodeId(nodeId); };
+  const handleDragOver = (e: React.DragEvent, targetId: string) => { e.preventDefault(); if (!draggedNodeId || draggedNodeId === targetId) return; const rect = (e.currentTarget as HTMLElement).getBoundingClientRect(); const position: DropPosition = e.clientY - rect.top < rect.height / 2 ? 'top' : 'bottom'; if (dropTarget?.targetId !== targetId || dropTarget?.position !== position) setDropTarget({ targetId, position }); };
+  const handleDragLeave = () => setDropTarget(null);
+  const handleDrop = (e: React.DragEvent) => { e.preventDefault(); if (draggedNodeId && dropTarget) handleMoveNode(draggedNodeId, dropTarget.targetId, dropTarget.position); setDraggedNodeId(null); setDropTarget(null); };
 
-  if (!websiteData || !activePage) { return <div className="editor-container items-center justify-center"><div className="dashboard-spinner"></div></div>; }
-  if (error) { return <div className="p-4 text-red-600">{error}</div>; }
+  // NEW: Multi-select alignment logic
+  const handleAlign = (alignment: 'flex-start' | 'center' | 'flex-end' | 'stretch') => {
+    updateWebsiteData(draft => {
+        const tree = editingContext === 'page' ? draft.pages.find(p => p.id === activePageId)?.children : draft[editingContext];
+        if (!tree) return;
+        selectedNodeIds.forEach(id => {
+            updateNodeById(tree, id, { styles: { desktop: { alignSelf: alignment }, tablet: {}, mobile: {} } });
+        });
+    }, `Align items ${alignment}`);
+  };
+
+  useEffect(() => {
+    if (selectedNodes.length > 1) {
+        const parent = findNodeAndParent(contentTree || [], selectedNodes[0].id)?.parent;
+        const allInSameParent = selectedNodes.every(node => findNodeAndParent(contentTree || [], node.id)?.parent === parent);
+        
+        if (allInSameParent) {
+            const firstNodeEl = document.querySelector(`[data-node-id="${selectedNodes[0].id}"]`) as HTMLElement;
+            if (firstNodeEl) {
+                const rect = firstNodeEl.getBoundingClientRect();
+                const previewWrapper = document.querySelector('.editor-preview-wrapper');
+                const scrollTop = previewWrapper?.scrollTop || 0;
+                setAlignmentToolbarState({ top: rect.top + scrollTop - 50, left: rect.left, width: rect.width });
+            }
+        } else {
+            setAlignmentToolbarState(null);
+        }
+    } else {
+        setAlignmentToolbarState(null);
+    }
+  }, [selectedNodeIds, contentTree]);
+
+  if (!websiteData || !activePage) return <div className="editor-container items-center justify-center"><div className="dashboard-spinner"></div></div>;
+  if (error) return <div className="p-4 text-red-600">{error}</div>;
 
   const nodePath = contentTree && selectedNode ? findNodePath(contentTree, selectedNode.id) : [];
 
   return (
     <div className={`editor-container ${editorTheme === 'dark' ? 'dark-mode' : ''}`}>
-      <EditorTopBar websiteName={websiteData.name} device={device} editingContext={editingContext} onSetDevice={setDevice} onSetEditingContext={setEditingContext} onPublish={() => setIsPublishModalOpen(true)} isSaving={isSaving} lastSaved={lastSaved} onUndo={undo} onRedo={redo} canUndo={canUndo} canRedo={canRedo} onOpenCommandPalette={() => setIsCommandPaletteOpen(true)} />
+      <style>{dynamicStyles}</style>
+      <EditorTopBar websiteName={websiteData.name} device={device} editingContext={editingContext} onSetDevice={setDevice} onSetEditingContext={setEditingContext} onPublish={() => setIsPublishModalOpen(true)} isSaving={isSaving} saveStatus={saveStatus} onUndo={undo} onRedo={redo} canUndo={canUndo} canRedo={canRedo} onOpenCommandPalette={() => setIsCommandPaletteOpen(true)} />
       <div className="editor-main">
         <aside className="editor-sidebar">
-          <div className="sidebar-tabs">
-             {[{id: 'pages', icon: LayersIcon, label: 'Layers'}, {id: 'add', icon: ComponentIcon, label: 'Add'}, {id: 'history', icon: HistoryIcon, label: 'History'}, {id: 'style', icon: SettingsIcon, label: 'Style'}, {id: 'settings', icon: SettingsIcon, label: 'Global'}].map(tab => (
-                 <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`sidebar-tab ${activeTab === tab.id ? 'active' : ''}`} disabled={tab.id === 'style' && selectedNodeIds.length === 0}>
-                    <tab.icon className="w-5 h-5" /> {tab.label}
-                 </button>
-             ))}
-          </div>
-          <div className="sidebar-content">
+           <div className="sidebar-tabs">{[{id: 'pages', icon: LayersIcon, label: 'Pages'}, {id: 'add', icon: ComponentIcon, label: 'Add'}, {id: 'history', icon: HistoryIcon, label: 'History'}, {id: 'style', icon: SettingsIcon, label: 'Style'}, {id: 'settings', icon: SettingsIcon, label: 'Global'}].map(tab => (<button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`sidebar-tab ${activeTab === tab.id ? 'active' : ''}`} disabled={tab.id === 'style' && selectedNodeIds.length === 0}><tab.icon className="w-5 h-5" /> {tab.label}</button>))}</div>
+           <div className="sidebar-content">
              {activeTab === 'pages' && (
-                <div className="p-2">
-                    <div className="flex items-center justify-between p-2">
-                        <h3 className="font-semibold">Pages</h3>
-                    </div>
-                     <div className="space-y-1">
-                     {websiteData.pages.map(page => (
-                        <div key={page.id} className={`p-2 rounded-md cursor-pointer flex items-center justify-between ${page.id === activePageId ? 'bg-indigo-100 text-indigo-800' : 'hover:bg-slate-100'}`} onClick={() => setActivePageId(page.id)}>
-                            <div className="flex items-center gap-2">
-                               {page.isHomepage && <HomeIcon className="w-4 h-4" />}
-                               <span>{page.name}</span>
-                            </div>
-                            <div>
-                                <button onClick={(e) => { e.stopPropagation(); handleDuplicatePage(page.id); }} className="text-slate-500 hover:text-indigo-600 p-1"><DuplicateIcon className="w-4 h-4"/></button>
-                                <button onClick={(e) => { e.stopPropagation(); setEditingPage(page); }} className="text-slate-500 hover:text-indigo-600 p-1"><PageSettingsIcon className="w-4 h-4"/></button>
-                            </div>
-                        </div>
-                     ))}
-                     </div>
-                     <hr className="my-2" />
-                     {contentTree?.map(child => <LayerItem key={child.id} node={child} device={device} selectedNodeIds={selectedNodeIds} onSelectNode={handleSelectNode} onRenameNode={handleRenameNode} />)}
-                </div>
+                <PagesAndLayersPanel
+                    pages={websiteData.pages}
+                    activePageId={activePageId}
+                    contentTree={contentTree || []}
+                    device={device}
+                    selectedNodeIds={selectedNodeIds}
+                    onSelectPage={setActivePageId}
+                    onCreatePage={handleCreatePage}
+                    onDuplicatePage={handleDuplicatePage}
+                    onDeletePage={handleDeletePage}
+                    onOpenPageSettings={handleOpenPageSettings}
+                    onSelectNode={handleSelectNode}
+                    onUpdateNode={handleUpdateNode}
+                    onToggleVisibility={handleToggleVisibility}
+                    onDragStart={handleDragStart}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    dropTarget={dropTarget}
+                />
              )}
              {activeTab === 'add' && <AddPanel onAddElement={handleAddElement} />}
-             {activeTab === 'history' && (
-                <div>
-                    {history.slice().reverse().map((item, index) => {
-                        const realIndex = history.length - 1 - index;
-                        return (
-                            <div key={realIndex} onClick={() => jumpToState(realIndex)} className={`history-item ${realIndex === currentIndex ? 'active' : ''}`}>
-                                {item.message}
-                            </div>
-                        )
-                    })}
-                </div>
-             )}
-             {activeTab === 'templates' && <SectionTemplatesPanel onAddSection={handleAddSection} />}
+             {activeTab === 'history' && (<div>{history.slice().reverse().map((item, index) => <div key={history.length - 1 - index} onClick={() => jumpToState(history.length - 1 - index)} className={`history-item ${history.length - 1 - index === currentIndex ? 'active' : ''}`}>{item.message}</div>)}</div>)}
              {activeTab === 'style' && selectedNode && ( <StylePanel key={selectedNode.id} node={selectedNode} nodePath={nodePath || []} onSelectNode={(id) => setSelectedNodeIds([id])} websiteData={websiteData} onUpdate={handleUpdateNode} onOpenAssetManager={() => setIsAssetManagerOpen(true)} /> )}
-             {activeTab === 'settings' && <GlobalSettingsForm websiteData={websiteData} setWebsiteData={setWebsiteData} onAddSection={handleAddSection} onSetEditingContext={setEditingContext} />}
+             {activeTab === 'settings' && <GlobalSettingsForm websiteData={websiteData} setWebsiteData={updateWebsiteData} onAddSection={handleAddSection} onSetEditingContext={setEditingContext} />}
           </div>
-           <div className="p-2 border-t flex items-center justify-between">
-                <div>
-                     <button onClick={() => setViewMode(viewMode === 'normal' ? 'wireframe' : 'normal')} className="p-2 rounded text-slate-500 hover:bg-slate-100" title="Toggle Wireframe Mode">
-                        <WireframeIcon className="w-5 h-5" />
-                    </button>
-                     <button onClick={() => setIsAssetManagerOpen(true)} className="p-2 rounded text-slate-500 hover:bg-slate-100" title="Asset Manager">
-                        <AssetIcon className="w-5 h-5" />
-                    </button>
-                </div>
-                <button onClick={() => setEditorTheme(editorTheme === 'light' ? 'dark' : 'light')} className="p-2 rounded text-slate-500 hover:bg-slate-100" title="Toggle Theme">
-                    {editorTheme === 'light' ? <MoonIcon className="w-5 h-5"/> : <SunIcon className="w-5 h-5"/>}
-                </button>
-           </div>
+           <div className="p-2 border-t flex items-center justify-between"><button onClick={() => setViewMode(v => v === 'normal' ? 'wireframe' : 'normal')}><WireframeIcon/></button><button onClick={() => setIsAssetManagerOpen(true)}><AssetIcon/></button><button onClick={() => setEditorTheme(t => t === 'light' ? 'dark' : 'light')}>{editorTheme === 'light' ? <MoonIcon/> : <SunIcon/>}</button></div>
         </aside>
         <main className={`editor-preview-wrapper ${viewMode === 'wireframe' ? 'wireframe-mode' : ''}`} onClick={() => setSelectedNodeIds([])}>
+             {alignmentToolbarState && (
+                <div className="alignment-toolbar" style={{ top: alignmentToolbarState.top, left: alignmentToolbarState.left }}>
+                    <button onClick={() => handleAlign('flex-start')} title="Align Top"><AlignTopIcon className="w-5 h-5" /></button>
+                    <button onClick={() => handleAlign('center')} title="Align Center"><AlignCenterVerticalIcon className="w-5 h-5" /></button>
+                    <button onClick={() => handleAlign('flex-end')} title="Align Bottom"><AlignBottomIcon className="w-5 h-5" /></button>
+                    <button onClick={() => handleAlign('stretch')} title="Stretch to Fill"><DistributeVerticalIcon className="w-5 h-5" /></button>
+                </div>
+             )}
             <div className={`preview-canvas preview-canvas-${device}`}>
-                <Preview websiteData={websiteData} activePage={activePage} interactive device={device} selectedNodeId={selectedNodeIds[0]} hoveredNodeId={hoveredNodeId} onSelectNode={(id, e) => handleSelectNode(id, e)} onHoverNode={setHoveredNodeId} onUpdateNode={handleUpdateNode} onAiTextUpdate={handleAiTextUpdate} isAiLoading={isAiLoading} onContextMenuRequest={handleContextMenuRequest} onAddSection={handleAddSection}/>
+                <Preview websiteData={websiteData} activePage={activePage} interactive device={device} selectedNodeId={selectedNodeIds[0]} selectedNodeIds={selectedNodeIds} hoveredNodeId={hoveredNodeId} onSelectNode={handleSelectNode} onHoverNode={setHoveredNodeId} onUpdateNode={handleUpdateNode} onAiTextUpdate={handleAiTextUpdate} isAiLoading={isAiLoading} onContextMenuRequest={handleContextMenuRequest} onAddSection={handleAddSection}/>
             </div>
         </main>
       </div>
       {isPublishModalOpen && session.username && <PublishModal username={session.username} websiteData={websiteData} onClose={() => setIsPublishModalOpen(false)} onPublishSuccess={(d) => { /* Can update state if needed */ }} />}
-      {editingPage && <PageSettingsModal page={editingPage} onClose={() => setEditingPage(null)} onSave={(updates) => handleUpdatePage(editingPage.id, updates)} />}
-       {isAssetManagerOpen && <AssetManager websiteData={websiteData} onClose={() => setIsAssetManagerOpen(false)} onUpdateAssets={(newAssets) => setWebsiteData(draft => { if (draft) draft.assets = newAssets; }, 'Update Assets')} />}
-      {contextMenu && (
-          <ContextMenu
-            x={contextMenu.x}
-            y={contextMenu.y}
-            nodeId={contextMenu.nodeId}
-            onClose={handleCloseContextMenu}
-            onDuplicate={() => handleDuplicateNode(contextMenu.nodeId)}
-            onDelete={() => handleDeleteNode(contextMenu.nodeId)}
-            onCopyStyles={() => handleCopyStyles(contextMenu.nodeId)}
-            onPasteStyles={() => handlePasteStyles(contextMenu.nodeId)}
-            onCopyNode={() => handleCopyNode(contextMenu.nodeId)}
-            onPasteNode={() => handlePasteNode(contextMenu.nodeId)}
-            onToggleLock={() => handleToggleLock(contextMenu.nodeId)}
-            canPasteStyles={!!copiedStyles}
-            canPasteNode={!!copiedNode}
-            node={findNodeById(contentTree || [], contextMenu.nodeId)}
-          />
-      )}
+      {editingPage && <PageSettingsModal page={editingPage} onClose={() => setEditingPage(null)} onSave={(updates) => updateWebsiteData(draft => { const p = draft.pages.find(p => p.id === editingPage.id); if (p) Object.assign(p, updates); }, 'Update page settings')} />}
+       {isAssetManagerOpen && <AssetManager websiteData={websiteData} onClose={() => setIsAssetManagerOpen(false)} onUpdateAssets={(newAssets) => updateWebsiteData(draft => { draft.assets = newAssets; }, 'Update Assets')} onSelectAsset={(url) => { if (selectedNode) { handleUpdateNode(selectedNode.id, { styles: { desktop: { backgroundImage: `url(${url})` }, tablet: {}, mobile: {}}}); setIsAssetManagerOpen(false); } }} />}
+      {contextMenu && <ContextMenu x={contextMenu.x} y={contextMenu.y} nodeId={contextMenu.nodeId} onClose={handleCloseContextMenu} onDuplicate={() => handleDuplicateNode(contextMenu.nodeId)} onDelete={() => handleDeleteNode(contextMenu.nodeId)} onCopyStyles={() => handleCopyStyles(contextMenu.nodeId)} onPasteStyles={() => handlePasteStyles(contextMenu.nodeId)} onCopyNode={() => handleCopyNode(contextMenu.nodeId)} onPasteNode={() => handlePasteNode(contextMenu.nodeId)} onToggleLock={() => handleToggleLock(contextMenu.nodeId)} canPasteStyles={!!copiedStyles} canPasteNode={!!copiedNode} node={findNodeById(contentTree || [], contextMenu.nodeId)} />}
     </div>
   );
 };

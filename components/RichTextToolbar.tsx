@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { BoldIcon, ItalicIcon, UnderlineIcon, ChainLinkIcon, StrikethroughIcon, ListOrderedIcon, ListUnorderedIcon, BlockquoteIcon, TextColorIcon } from './icons';
+import { BoldIcon, ItalicIcon, UnderlineIcon, ChainLinkIcon, StrikethroughIcon, ListOrderedIcon, ListUnorderedIcon, BlockquoteIcon, TextColorIcon, XIcon } from './icons';
 
 const RichTextToolbar: React.FC = () => {
   const [activeFormats, setActiveFormats] = useState<Record<string, boolean>>({});
@@ -9,7 +9,19 @@ const RichTextToolbar: React.FC = () => {
   const linkInputRef = useRef<HTMLInputElement>(null);
   const lastSelection = useRef<Range | null>(null);
 
+  const getParentLink = (selection: Selection | null): HTMLAnchorElement | null => {
+      if (!selection || selection.rangeCount === 0) return null;
+      let node = selection.getRangeAt(0).startContainer;
+      while (node && node.nodeName !== 'A') {
+          node = node.parentNode!;
+      }
+      return node as HTMLAnchorElement;
+  };
+
   const updateActiveFormats = useCallback(() => {
+    const selection = window.getSelection();
+    const parentLink = getParentLink(selection);
+
     setActiveFormats({
       bold: document.queryCommandState('bold'),
       italic: document.queryCommandState('italic'),
@@ -17,7 +29,17 @@ const RichTextToolbar: React.FC = () => {
       strikethrough: document.queryCommandState('strikethrough'),
       insertOrderedList: document.queryCommandState('insertOrderedList'),
       insertUnorderedList: document.queryCommandState('insertUnorderedList'),
+      link: !!parentLink,
     });
+    
+    // Auto-open link editor if cursor is inside a link
+    if (parentLink) {
+        setLinkUrl(parentLink.getAttribute('href') || '');
+        setIsLinkEditorOpen(true);
+    } else {
+        setIsLinkEditorOpen(false);
+    }
+
   }, []);
 
   useEffect(() => {
@@ -27,7 +49,12 @@ const RichTextToolbar: React.FC = () => {
         }
     };
     document.addEventListener('selectionchange', handleSelectionChange);
-    return () => document.removeEventListener('selectionchange', handleSelectionChange);
+    // Add a click listener to handle link selection
+    document.addEventListener('click', handleSelectionChange);
+    return () => {
+        document.removeEventListener('selectionchange', handleSelectionChange);
+        document.removeEventListener('click', handleSelectionChange);
+    }
   }, [updateActiveFormats]);
   
   const saveSelection = () => {
@@ -53,46 +80,48 @@ const RichTextToolbar: React.FC = () => {
     document.activeElement instanceof HTMLElement && document.activeElement.focus();
   };
   
-  // FIX: Re-engineered to use spans with inline styles instead of deprecated `foreColor`
   const applyColor = (color: string) => {
     restoreSelection();
     if (lastSelection.current) {
-        const selection = window.getSelection();
-        if (selection && selection.rangeCount > 0) {
-            const range = selection.getRangeAt(0);
-            const span = document.createElement('span');
-            span.style.color = color;
-            
-            // If the selection is collapsed (a cursor), start typing with the new color
-            if (range.collapsed) {
-                // This is complex to manage without a full editor library. 
-                // For now, we only support coloring selections.
-            } else {
-                 // Surround the selected content with the new span
-                span.appendChild(range.extractContents());
-                range.insertNode(span);
-            }
-            selection.removeAllRanges();
-        }
+        // Use the browser's built-in command for coloring. It's more robust for complex selections.
+        // styleWithCSS ensures it uses <span> tags with styles instead of deprecated <font> tags.
+        document.execCommand('styleWithCSS', false, 'true');
+        document.execCommand('foreColor', false, color);
     }
     setIsColorPickerOpen(false);
+    updateActiveFormats();
     document.activeElement instanceof HTMLElement && document.activeElement.focus();
   };
 
 
   const toggleLink = () => {
     saveSelection();
-    setIsLinkEditorOpen(true);
+    setIsLinkEditorOpen(!isLinkEditorOpen);
     setTimeout(() => linkInputRef.current?.focus(), 0);
   }
 
   const handleSetLink = () => {
     restoreSelection();
     if (lastSelection.current) {
-        document.execCommand('createLink', false, linkUrl);
+        // If selection is collapsed and we're inside a link, modify the existing link
+        const parentLink = getParentLink(window.getSelection());
+        if (parentLink) {
+            parentLink.href = linkUrl;
+        } else {
+            document.execCommand('createLink', false, linkUrl);
+        }
     }
     setIsLinkEditorOpen(false);
     setLinkUrl('');
+    document.activeElement instanceof HTMLElement && document.activeElement.focus();
+  }
+  
+  const handleUnlink = () => {
+    restoreSelection();
+    if (lastSelection.current) {
+        document.execCommand('unlink', false);
+    }
+    setIsLinkEditorOpen(false);
     document.activeElement instanceof HTMLElement && document.activeElement.focus();
   }
   
@@ -112,7 +141,7 @@ const RichTextToolbar: React.FC = () => {
       <button onClick={() => applyFormat('strikethrough')} className={`rich-text-toolbar-button ${activeFormats.strikethrough ? 'active' : ''}`}><StrikethroughIcon className="w-5 h-5"/></button>
       <button onClick={() => applyFormat('insertOrderedList')} className={`rich-text-toolbar-button ${activeFormats.insertOrderedList ? 'active' : ''}`}><ListOrderedIcon className="w-5 h-5"/></button>
       <button onClick={() => applyFormat('insertUnorderedList')} className={`rich-text-toolbar-button ${activeFormats.insertUnorderedList ? 'active' : ''}`}><ListUnorderedIcon className="w-5 h-5"/></button>
-      <button onClick={toggleLink} className="rich-text-toolbar-button"><ChainLinkIcon className="w-5 h-5"/></button>
+      <button onClick={toggleLink} className={`rich-text-toolbar-button ${activeFormats.link ? 'active' : ''}`}><ChainLinkIcon className="w-5 h-5"/></button>
       <div className="relative">
           <button onClick={handleColorPickerToggle} className="rich-text-toolbar-button"><TextColorIcon className="w-5 h-5"/></button>
           {isColorPickerOpen && (
@@ -126,6 +155,7 @@ const RichTextToolbar: React.FC = () => {
         <div className="rich-text-link-popover">
           <input ref={linkInputRef} type="text" value={linkUrl} onChange={e => setLinkUrl(e.target.value)} placeholder="https://example.com" onKeyDown={(e) => e.key === 'Enter' && handleSetLink()}/>
           <button onClick={handleSetLink}>Set</button>
+          {activeFormats.link && <button onClick={handleUnlink} title="Unlink" className="p-1 text-red-400 hover:text-red-200"><XIcon className="w-4 h-4" /></button>}
         </div>
       )}
     </div>

@@ -21,28 +21,31 @@ export default async function handler(request: Request) {
         const safeUsername = username.toLowerCase().replace(/[^a-z0-9-]/g, '');
         const editorDataKey = `editor:${websiteData.id}`;
         
-        // Get the state of the website before this publish event
         const oldWebsiteData = await kv.get<WebsiteData>(editorDataKey);
         const oldPublishedSlugs = new Set(oldWebsiteData?.pages.filter(p => !p.isDraft).map(p => p.slug) || []);
         
         const publishablePages = websiteData.pages.filter(p => !p.isDraft);
         const newPublishedSlugs = new Set(publishablePages.map(p => p.slug));
         
-        // NEW: Update timestamp on publish
         websiteData.lastUpdatedAt = new Date().toISOString();
 
         const pipeline = kv.pipeline();
 
-        // 1. Process all publishable pages
+        // 1. Save the single, authoritative copy of the website data
+        pipeline.set(editorDataKey, JSON.stringify(websiteData));
+
+        // 2. Process all publishable pages by creating lightweight pointers
         for (const page of publishablePages) {
             const safeSlug = page.slug.toLowerCase().replace(/[^a-z0-9-]/g, '');
             if (!safeSlug) continue;
 
             const pageKey = `site:${safeUsername}/${safeSlug}`;
-            pipeline.set(pageKey, JSON.stringify({ site: websiteData, page }));
+            // Store a lightweight pointer instead of the full data
+            const pointer = { websiteId: websiteData.id, pageId: page.id };
+            pipeline.set(pageKey, JSON.stringify(pointer));
         }
         
-        // 2. Delete pages that were published before but are now drafted/deleted
+        // 3. Delete pages that were published before but are now drafted/deleted
         for (const oldSlug of oldPublishedSlugs) {
             if (typeof oldSlug !== 'string') continue;
             if (!newPublishedSlugs.has(oldSlug)) {
@@ -52,25 +55,20 @@ export default async function handler(request: Request) {
             }
         }
 
-        // 3. Set the main site entry point (homepage)
-        // BUGFIX: Logic is updated to prevent site from going down if homepage is unpublished.
+        // 4. Set the main site entry point (homepage) as a pointer
         let newHomepage = publishablePages.find(p => p.isHomepage);
-        // If the designated homepage is drafted, or none is set, find the first available published page.
         if (!newHomepage && publishablePages.length > 0) {
             newHomepage = publishablePages[0];
         }
 
+        const mainKey = `site:${safeUsername}`;
         if (newHomepage) {
-            const mainKey = `site:${safeUsername}`;
-            pipeline.set(mainKey, JSON.stringify({ site: websiteData, page: newHomepage }));
+            const pointer = { websiteId: websiteData.id, pageId: newHomepage.id };
+            pipeline.set(mainKey, JSON.stringify(pointer));
         } else {
-             // Only delete the root entry if there are NO publishable pages left.
-            pipeline.del(`site:${safeUsername}`);
+            pipeline.del(mainKey);
         }
         
-        // 4. Update the editor's source of truth
-        pipeline.set(editorDataKey, JSON.stringify(websiteData));
-
         await pipeline.exec();
 
         const successUrl = newHomepage ? `/${safeUsername}/${newHomepage.slug}` : `/${safeUsername}`;

@@ -8,17 +8,20 @@ export const config = {
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
 
 const getPromptForAction = (action: string, text: string, tone?: string): string => {
+    const baseInstruction = `You are an expert copy-editor. Your task is to modify the provided HTML content.
+IMPORTANT: You MUST preserve all HTML tags (like <b>, <i>, <a>, <span>, etc.) and their attributes exactly as they are. Only modify the text content within the tags. Do not add any extra commentary or markdown. Return only the modified HTML content.`;
+
     switch (action) {
         case 'improve':
-            return `You are an expert copy-editor. Improve the following text by correcting grammar, improving clarity, and enhancing the flow. Do not add any extra commentary, just return the improved text.\n\nOriginal Text: "${text}"`;
+            return `${baseInstruction}\n\nImprove the following HTML by correcting grammar, improving clarity, and enhancing flow:\n\n${text}`;
         case 'shorten':
-            return `You are an expert copy-editor. Shorten the following text while preserving its core meaning and key information. Do not add any extra commentary, just return the shortened text.\n\nOriginal Text: "${text}"`;
+            return `${baseInstruction}\n\nShorten the text within the following HTML while preserving its core meaning:\n\n${text}`;
         case 'lengthen':
-            return `You are an expert copywriter. Expand on the following text, adding more detail, examples, or explanation to make it more comprehensive. Do not add any extra commentary, just return the lengthened text.\n\nOriginal Text: "${text}"`;
+            return `${baseInstruction}\n\nExpand on the text within the following HTML, adding more detail or explanation:\n\n${text}`;
         case 'change-tone':
-            return `You are an expert copywriter. Rewrite the following text to have a ${tone || 'professional'} tone. Do not add any extra commentary, just return the rewritten text.\n\nOriginal Text: "${text}"`;
+            return `${baseInstruction}\n\nRewrite the text within the following HTML to have a ${tone || 'professional'} tone:\n\n${text}`;
         case 'generate':
-             return `You are an expert copywriter for a business website. The user has an element with the placeholder text "${text}". Generate new, context-aware content to replace it. Be concise and professional. Do not add any extra commentary, just return the generated text.`;
+             return `You are an expert copywriter for a business website. The user has an element with this placeholder text: "${text}". Generate new, professional content to replace it. Wrap key phrases in <b> tags if appropriate. Return only the generated HTML.`;
         default:
             throw new Error(`Invalid action: ${action}`);
     }

@@ -13,9 +13,11 @@ const AssetManager: React.FC<AssetManagerProps> = ({ websiteData, onClose, onUpd
 
     const handleAddAsset = () => {
         if (newImageUrl.trim()) {
+            // FIX: Clean up the URL to generate a better default name
+            const cleanedUrl = newImageUrl.split('?')[0].split('#')[0];
             const newAsset = {
                 id: `asset-${Date.now()}`,
-                name: newImageUrl.split('/').pop() || 'new-image',
+                name: cleanedUrl.split('/').pop() || 'new-image',
                 url: newImageUrl,
             };
             onUpdateAssets([...websiteData.assets, newAsset]);

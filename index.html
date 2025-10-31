@@ -195,10 +195,18 @@
       .layer-item-icon { width: 16px; height: 16px; color: #64748b; }
       .layer-item.selected .layer-item-icon { color: var(--accent-color); }
       .layer-children { padding-left: 20px; border-left: 1px solid; margin-left: 8px; }
-      .drop-indicator-top::before, .drop-indicator-bottom::after { content: ''; position: absolute; left: 0; right: 0; height: 2px; background-color: var(--accent-color); z-index: 10; }
-      .drop-indicator-top::before { top: -1px; }
-      .drop-indicator-bottom::after { bottom: -1px; }
+      .drop-indicator-top::before, .drop-indicator-bottom::after { content: ''; position: absolute; left: 0; right: 0; height: 4px; background-color: var(--accent-color); opacity: 0.6; border-radius: 2px; z-index: 10; pointer-events: none; }
+      .drop-indicator-top::before { top: -2px; }
+      .drop-indicator-bottom::after { bottom: -2px; }
       
+      /* NEW: Pages & Layers Panel */
+      .pages-list { padding: 8px; border-bottom: 1px solid var(--sidebar-border); }
+      .page-item { display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; border-radius: 4px; font-size: 14px; }
+      .page-item.active { background-color: var(--accent-color-light); font-weight: 600; color: var(--accent-color-dark); }
+      .page-item:not(.active):hover { background-color: rgba(100,116,139, 0.1); }
+      .page-item-kebab { position: relative; }
+      .page-item-kebab-menu { position: absolute; right: 0; top: 100%; background-color: var(--sidebar-bg); border: 1px solid var(--sidebar-border); border-radius: 4px; z-index: 50; padding: 4px; }
+
       /* NEW: History Panel */
       .history-item { padding: 8px 12px; font-size: 14px; cursor: pointer; border-bottom: 1px solid var(--sidebar-border); }
       .history-item:hover { background-color: rgba(100,116,139, 0.05); }
@@ -218,6 +226,17 @@
       .global-color-swatch.selected { border-color: var(--accent-color); }
       .four-sided-control { display: grid; grid-template-columns: 1fr auto 1fr; gap: 4px; align-items: center; }
       .four-sided-control input { width: 100%; }
+      /* NEW: Layout Picker */
+      .layout-picker { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; }
+      .layout-option { display: flex; gap: 4px; padding: 8px; border: 2px solid var(--sidebar-border); border-radius: 4px; cursor: pointer; }
+      .layout-option.selected { border-color: var(--accent-color); }
+      .layout-option .col { background-color: #dbeafe; flex-grow: 1; height: 24px; border-radius: 2px; }
+      /* NEW: Background Picker */
+      .background-picker { border: 1px solid var(--sidebar-border); border-radius: 6px; }
+      .background-picker-tabs { display: flex; border-bottom: 1px solid var(--sidebar-border); }
+      .background-picker-tab { flex: 1; text-align: center; padding: 8px; font-size: 14px; cursor: pointer; background-color: #f8fafc; }
+      .background-picker-tab.active { background-color: var(--sidebar-bg); font-weight: 600; }
+
 
       /* Add Panel */
       .add-element-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem; padding: 1rem; }
@@ -258,7 +277,7 @@
       .command-palette-item.selected { background-color: var(--accent-color-light); }
 
       /* NEW: Multi-select Alignment Toolbar */
-      .alignment-toolbar { display: flex; gap: 2px; padding: 2px; border-radius: 6px; background-color: var(--sidebar-bg); border: 1px solid var(--sidebar-border); box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+      .alignment-toolbar { position: absolute; z-index: 25; display: flex; gap: 2px; padding: 4px; border-radius: 6px; background-color: var(--sidebar-bg); border: 1px solid var(--sidebar-border); box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1); }
       .alignment-toolbar button { background: none; border: none; padding: 6px; border-radius: 4px; cursor: pointer; color: var(--text-color-secondary); }
       .alignment-toolbar button:hover { background-color: rgba(100,116,139, 0.1); color: var(--text-color-primary); }
       

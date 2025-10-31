@@ -7,6 +7,12 @@ export const config = {
   runtime: 'edge',
 };
 
+// Define the type for our new pointer structure
+interface SitePointer {
+    websiteId: string;
+    pageId: string;
+}
+
 export default async function handler(request: Request) {
   if (request.method !== 'GET') {
     return new Response(JSON.stringify({ message: 'Method Not Allowed' }), { 
@@ -31,30 +37,60 @@ export default async function handler(request: Request) {
     const safeSlug = slugParam ? slugParam.toLowerCase().replace(/[^a-z0-9-]/g, '') : null;
 
     const key = safeSlug ? `site:${safeUsername}/${safeSlug}` : `site:${safeUsername}`;
-    const rawData = await kv.get<{ site: WebsiteData, page: Page }>(key);
     
-    if (rawData && rawData.site && rawData.page) {
-        // NEW: Check for password protection
-        if (rawData.page.password) {
-            const providedPassword = request.headers.get('x-password');
-            if (providedPassword !== rawData.page.password) {
-                return new Response(JSON.stringify({ passwordRequired: true }), { 
-                    status: 200, // Send 200 so frontend can handle it
-                    headers: { 'Content-Type': 'application/json' } 
-                });
-            }
-        }
+    // Step 1: Fetch the pointer from the live site key
+    const pointer = await kv.get<SitePointer>(key);
 
-        return new Response(JSON.stringify(rawData), { 
-            status: 200, 
-            headers: { 'Content-Type': 'application/json' } 
-        });
-    } else {
+    if (!pointer || !pointer.websiteId || !pointer.pageId) {
         return new Response(JSON.stringify({ message: 'Site not found.' }), { 
             status: 404, 
             headers: { 'Content-Type': 'application/json' } 
         });
     }
+
+    // Step 2: Fetch the full website data using the pointer's websiteId
+    const websiteData = await kv.get<WebsiteData>(`editor:${pointer.websiteId}`);
+
+    if (!websiteData) {
+        // This case indicates data inconsistency, but we'll treat it as a 404.
+        return new Response(JSON.stringify({ message: 'Site data could not be loaded.' }), { 
+            status: 404, 
+            headers: { 'Content-Type': 'application/json' } 
+        });
+    }
+
+    // Step 3: Find the specific page within the full website data
+    const pageData = websiteData.pages.find(p => p.id === pointer.pageId);
+
+    if (!pageData) {
+         return new Response(JSON.stringify({ message: 'Page not found within the site.' }), { 
+            status: 404, 
+            headers: { 'Content-Type': 'application/json' } 
+        });
+    }
+        
+    // NEW: Check for password protection
+    if (pageData.password) {
+        const providedPassword = request.headers.get('x-password');
+        if (providedPassword !== pageData.password) {
+            return new Response(JSON.stringify({ passwordRequired: true }), { 
+                status: 200, // Send 200 so frontend can handle it
+                headers: { 'Content-Type': 'application/json' } 
+            });
+        }
+    }
+    
+    // Step 4: Construct the final response object in the format the frontend expects
+    const finalResponse = {
+        site: websiteData,
+        page: pageData,
+    };
+
+    return new Response(JSON.stringify(finalResponse), { 
+        status: 200, 
+        headers: { 'Content-Type': 'application/json' } 
+    });
+
   } catch (error) {
     console.error('Error in /api/site:', error);
     return new Response(JSON.stringify({ message: 'Failed to retrieve site data.' }), { 

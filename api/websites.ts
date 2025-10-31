@@ -21,19 +21,24 @@ function deepCloneWebsite(website: WebsiteData): WebsiteData {
 
     const cloneNode = (node: any): any => {
         const newNode = { ...node, id: generateId(node.id) };
+        
+        // Handle nested content structures like Tabs and Accordions
+        if (typeof newNode.content === 'object' && newNode.content !== null) {
+            if (Array.isArray(newNode.content.items)) {
+                 newNode.content.items = newNode.content.items.map((item: any) => {
+                     const newItem = {...item, id: generateId(item.id)};
+                     if (Array.isArray(newItem.content)) { // For Tabs
+                         newItem.content = newItem.content.map(cloneNode);
+                     }
+                     return newItem;
+                });
+            }
+        }
+
         if (Array.isArray(newNode.children)) {
             newNode.children = newNode.children.map(cloneNode);
         }
-        // Handle nested content structures like Tabs
-        if (newNode.content?.items) {
-             newNode.content.items = newNode.content.items.map((item: any) => {
-                 const newItem = {...item, id: generateId(item.id)};
-                 if (Array.isArray(newItem.content)) {
-                     newItem.content = newItem.content.map(cloneNode);
-                 }
-                 return newItem;
-            });
-        }
+
         return newNode;
     };
 

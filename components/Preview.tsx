@@ -4,6 +4,7 @@ import type { WebsiteData, ThemeConfig, Theme, WebsiteNode, Element as IElement,
 import { PlusIcon, availableIcons, IconRenderer as Icon } from './icons';
 import AiToolbar from './AiToolbar';
 import RichTextToolbar from './RichTextToolbar';
+import ContentEditable from './ContentEditable';
 
 interface PreviewProps {
   websiteData: WebsiteData;
@@ -11,6 +12,7 @@ interface PreviewProps {
   interactive?: boolean;
   device?: Device;
   selectedNodeId?: string | null;
+  selectedNodeIds?: string[]; // For multi-select awareness
   hoveredNodeId?: string | null;
   onSelectNode?: (id: string, e: React.MouseEvent) => void;
   onHoverNode?: (id: string | null) => void;
@@ -45,18 +47,45 @@ const mergeStylesForDevice = (styles: ResponsiveStyles, device: Device): StylePr
 };
 
 
-// NEW: Accordion Preview Component
-const Accordion: React.FC<{ element: AccordionElement, interactive?: boolean }> = ({ element, interactive }) => {
-    const [openItem, setOpenItem] = useState<string | null>(null);
+// FIX: Accordion now renders all items expanded in interactive mode for editing.
+const Accordion: React.FC<Omit<PreviewProps, 'websiteData' | 'activePage'> & { element: AccordionElement, theme: ThemeConfig, websiteData: WebsiteData, context: 'page' | 'header' | 'footer' }> = ({ element, interactive, ...props }) => {
+    const [openItem, setOpenItem] = useState<string | null>(!interactive ? element.content.items[0]?.id : null);
+    
+    if (interactive) {
+      return (
+        <div className="preview-accordion-interactive">
+          {element.content.items.map((item, index) => (
+             <div key={item.id} className="mb-2">
+                <div className="p-2 bg-slate-100 font-semibold text-sm text-slate-600 rounded-t-md">
+                    Item {index + 1}: {item.title}
+                </div>
+                <div className="p-4 border-l border-r border-b rounded-b-md">
+                    <ContentEditable 
+                        tagName="div"
+                        html={item.content}
+                        onChange={(newHtml) => {
+                            if (props.onUpdateNode) {
+                                const newItems = element.content.items.map(i => i.id === item.id ? {...i, content: newHtml} : i);
+                                props.onUpdateNode(element.id, { content: { ...element.content, items: newItems } });
+                            }
+                        }}
+                    />
+                </div>
+             </div>
+          ))}
+        </div>
+      )
+    }
+
     return (
         <div className="preview-accordion">
             {element.content.items.map(item => (
                 <div key={item.id} className="preview-accordion-item">
-                    <div className="preview-accordion-title" onClick={() => !interactive && setOpenItem(openItem === item.id ? null : item.id)}>
+                    <div className="preview-accordion-title" onClick={() => setOpenItem(openItem === item.id ? null : item.id)}>
                         {item.title}
-                        <span>{interactive ? '−' : (openItem === item.id ? '−' : '+')}</span>
+                        <span>{(openItem === item.id ? '−' : '+')}</span>
                     </div>
-                    {(interactive || openItem === item.id) && <div className="preview-accordion-content">{item.content}</div>}
+                    {openItem === item.id && <div className="preview-accordion-content">{item.content}</div>}
                 </div>
             ))}
         </div>
@@ -118,9 +147,8 @@ const ElementRenderer: React.FC<{
          if (element.type !== 'divider' && element.type !== 'navigation' && element.type !== 'spacer') return null;
     }
 
-    const handleContentInput = (e: React.FormEvent<HTMLElement>) => {
+    const handleContentChange = (newHtml: string) => {
         if (!interactive || !onUpdateNode) return;
-        const newHtml = e.currentTarget.innerHTML;
         onUpdateNode(element.id, { content: { ...(element as any).content, text: newHtml } });
     };
   
@@ -128,11 +156,24 @@ const ElementRenderer: React.FC<{
         case 'headline': {
             const { level, text } = element.content as HeadlineElement['content'];
             const Tag = (level && ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(level)) ? level : 'h2';
-            return ( <Tag contentEditable={interactive} onInput={handleContentInput} suppressContentEditableWarning dangerouslySetInnerHTML={{ __html: text }} /> );
+            return (
+                <ContentEditable
+                    tagName={Tag}
+                    html={text}
+                    onChange={handleContentChange}
+                />
+            );
         }
         case 'text': {
             const { text } = element.content as TextElement['content'];
-            return ( <div className="whitespace-pre-wrap leading-relaxed" contentEditable={interactive} onInput={handleContentInput} suppressContentEditableWarning dangerouslySetInnerHTML={{ __html: text }} /> );
+            return (
+                <ContentEditable
+                    tagName="div"
+                    className="whitespace-pre-wrap leading-relaxed"
+                    html={text}
+                    onChange={handleContentChange}
+                />
+            );
         }
         case 'image': {
             const { src, alt } = element.content as ImageElement['content'];
@@ -142,16 +183,9 @@ const ElementRenderer: React.FC<{
         case 'button': {
             const { text, href } = element.content as ButtonElement['content'];
             if (!text || !href) { return null; }
-            const handleBlur = (e: React.FocusEvent<HTMLElement>) => {
-              if (!interactive || !onUpdateNode) return;
-              const newText = e.currentTarget.innerText;
-              if (text !== newText) {
-                  onUpdateNode(element.id, { content: { ...element.content, text: newText } });
-              }
-            };
             return (
                 <a href={href} className={`inline-block ${theme.primary} ${theme.primaryText} px-6 py-3 rounded-md font-semibold no-underline`}>
-                    <span contentEditable={interactive} onBlur={handleBlur} suppressContentEditableWarning>{text}</span>
+                    <ContentEditable tagName="span" html={text} onChange={handleContentChange} />
                 </a>
             );
         }
@@ -249,7 +283,7 @@ const ElementRenderer: React.FC<{
                 </div>
             )
         }
-        case 'accordion': return <Accordion element={element as AccordionElement} interactive={interactive} />;
+        case 'accordion': return <Accordion element={element as AccordionElement} interactive={interactive} {...props} />;
         case 'tabs': return <Tabs element={element as TabsElement} interactive={interactive} {...props} />;
         case 'socialIcons': {
             const { networks } = element.content as SocialIconsElement['content'];
@@ -340,7 +374,7 @@ const InteractiveWrapper: React.FC<React.PropsWithChildren<{
 };
 
 const NodeRenderer: React.FC<Omit<PreviewProps, 'websiteData' | 'activePage'> & { node: WebsiteNode, theme: ThemeConfig, websiteData: WebsiteData, context: 'page' | 'header' | 'footer' }> = (props) => {
-    const { node, theme, device = 'desktop' } = props;
+    const { node, theme, device = 'desktop', selectedNodeIds = [] } = props;
 
     if (!node || !node.id || !node.type) { return null; }
     
@@ -356,7 +390,7 @@ const NodeRenderer: React.FC<Omit<PreviewProps, 'websiteData' | 'activePage'> & 
     if (!isVisible && !props.interactive) return null;
 
 
-    const isSelected = props.interactive && props.selectedNodeId === node.id;
+    const isSelected = props.interactive && selectedNodeIds.includes(node.id);
     const isHovered = props.interactive && props.hoveredNodeId === node.id && !isSelected;
     const mergedStyles = mergeStylesForDevice(node.styles, device);
 
