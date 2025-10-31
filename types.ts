@@ -1,5 +1,6 @@
 
 
+
 export type Theme = 'light' | 'dark' | 'ocean' | 'forest';
 export type Device = 'desktop' | 'tablet' | 'mobile';
 
@@ -31,10 +32,16 @@ export interface StyleProperties {
   height?: string; // For Spacer
   width?: string;
   // Layout (Flexbox)
-  display?: 'flex';
+  display?: 'flex' | 'none'; // Added 'none' for visibility
   flexDirection?: 'row' | 'column';
   justifyContent?: 'flex-start' | 'flex-end' | 'center' | 'space-between' | 'space-around' | 'space-evenly';
   alignItems?: 'flex-start' | 'flex-end' | 'center' | 'stretch' | 'baseline';
+  flexBasis?: string; // For column widths
+  // New Styling Features
+  boxShadow?: string;
+  filter?: string; // For image filters
+  aspectRatio?: string;
+  objectFit?: 'cover' | 'contain' | 'fill' | 'none' | 'scale-down';
 }
 
 export type ResponsiveStyles = {
@@ -48,11 +55,16 @@ interface StructureNode<T extends string> {
   id: string;
   type: T;
   styles: ResponsiveStyles;
+  hoverStyles?: ResponsiveStyles; // For hover effects
   animation?: 'none' | 'fadeIn' | 'slideInUp';
+  locked?: boolean; // To prevent editing
+  visibility?: { // To hide on specific devices
+      [key in Device]?: boolean;
+  };
 }
 
 // CONTENT ELEMENT TYPES
-export type ElementType = 'headline' | 'text' | 'image' | 'button' | 'spacer' | 'icon' | 'video' | 'form' | 'embed';
+export type ElementType = 'headline' | 'text' | 'image' | 'button' | 'spacer' | 'icon' | 'video' | 'form' | 'embed' | 'navigation' | 'gallery' | 'divider' | 'map';
 
 export interface HeadlineElement extends StructureNode<'headline'> {
   content: { text: string; level: 'h1' | 'h2' | 'h3' };
@@ -81,9 +93,22 @@ export interface FormElement extends StructureNode<'form'> {
 export interface EmbedElement extends StructureNode<'embed'> {
     content: { html: string };
 }
+export interface NavigationElement extends StructureNode<'navigation'> {
+    content: {}; // Content is generated from pages
+}
+export interface GalleryElement extends StructureNode<'gallery'> {
+    content: { images: { src: string; alt: string }[] };
+}
+export interface DividerElement extends StructureNode<'divider'> {
+    content: {}; // Styled via style panel
+}
+export interface MapElement extends StructureNode<'map'> {
+    content: { embedUrl: string };
+}
 
 
-export type Element = HeadlineElement | TextElement | ImageElement | ButtonElement | SpacerElement | IconElement | VideoElement | FormElement | EmbedElement;
+
+export type Element = HeadlineElement | TextElement | ImageElement | ButtonElement | SpacerElement | IconElement | VideoElement | FormElement | EmbedElement | NavigationElement | GalleryElement | DividerElement | MapElement;
 
 // LAYOUT STRUCTURE TYPES
 export interface Column extends StructureNode<'column'> {
@@ -118,6 +143,10 @@ export interface WebsiteData {
   name: string;
   theme: Theme;
   faviconUrl?: string;
+  googleFont?: string; // For Google Fonts
+  customCursor?: string; // For custom cursors
+  header: Section[]; // Global Header
+  footer: Section[]; // Global Footer
   palette: {
       primary: string;
       secondary: string;

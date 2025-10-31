@@ -1,4 +1,3 @@
-
 import { v4 as uuidv4 } from 'uuid';
 import type { WebsiteNode, Section, Row, Column, Element, ResponsiveStyles, Page } from '../types';
 
@@ -41,6 +40,14 @@ export function updateNodeById(nodes: WebsiteNode[], id: string, updates: Partia
                     mobile: { ...node.styles.mobile, ...updates.styles.mobile },
                 };
             }
+            
+            if (updates.hoverStyles) {
+                updatedNode.hoverStyles = {
+                    desktop: { ...(node.hoverStyles?.desktop || {}), ...updates.hoverStyles.desktop },
+                    tablet: { ...(node.hoverStyles?.tablet || {}), ...updates.hoverStyles.tablet },
+                    mobile: { ...(node.hoverStyles?.mobile || {}), ...updates.hoverStyles.mobile },
+                };
+            }
 
             nodes[i] = updatedNode as WebsiteNode;
             return true;
@@ -80,7 +87,7 @@ const createDefaultStyles = (): ResponsiveStyles => ({
 
 
 const createDefaultElement = (type: Element['type']): Element => {
-    const base = { id: uuidv4(), styles: createDefaultStyles() };
+    const base = { id: uuidv4(), styles: createDefaultStyles(), visibility: { desktop: true, tablet: true, mobile: true } };
     switch(type) {
         case 'headline': return { ...base, type: 'headline', content: { level: 'h2', text: 'New Headline' } };
         case 'text': return { ...base, type: 'text', content: { text: 'New paragraph of text. Click here to edit.' } };
@@ -91,16 +98,21 @@ const createDefaultElement = (type: Element['type']): Element => {
         case 'video': return { ...base, type: 'video', content: { src: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' } };
         case 'form': return { ...base, type: 'form', content: { buttonText: 'Submit' } };
         case 'embed': return { ...base, type: 'embed', content: { html: '<p class="p-4 bg-slate-100 rounded text-center">Your embedded content will show here.</p>' } };
+        case 'navigation': return { ...base, type: 'navigation', content: {} };
+        case 'gallery': return { ...base, type: 'gallery', content: { images: [ { src: 'https://images.unsplash.com/photo-1599420186946-7b6fb4e297f0?q=80&w=1887', alt: 'Placeholder 1'}, { src: 'https://images.unsplash.com/photo-1581093450021-4a7360e9a1c8?q=80&w=1887', alt: 'Placeholder 2'}, { src: 'https://images.unsplash.com/photo-1518770660439-4636190af475?q=80&w=2070', alt: 'Placeholder 3'}, { src: 'https://images.unsplash.com/photo-1620712943543-2858200f7426?q=80&w=2070', alt: 'Placeholder 4'} ]} };
+        // FIX: Replaced invalid `margin` property with `marginTop` and `marginBottom`.
+        case 'divider': return { ...base, type: 'divider', content: {}, styles: { desktop: { height: '1px', backgroundColor: '#cbd5e1', marginTop: '1rem', marginBottom: '1rem' }, tablet: {}, mobile: {} } };
+        case 'map': return { ...base, type: 'map', content: { embedUrl: 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3022.610224424263!2d-73.98785368459384!3d40.74844097932824!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x89c259a9b3117469%3A0xd134e199a405a163!2sEmpire%20State%20Building!5e0!3m2!1sen!2sus!4v1676231998539!5m2!1sen!2sus' } };
     }
 }
 
 
 // Immer-compatible function to add a new node
 // FIX: Widen type to include 'section' to match implementation and fix comparison error.
-export const addNode = (draft: Page, parentId: string, type: 'section' | 'row' | 'column' | Element['type']) => {
+export const addNode = (draft: { children: WebsiteNode[] }, parentId: string, type: 'section' | 'row' | 'column' | Element['type']) => {
     // Handle adding a section to the root (the page)
-    if (parentId === draft.id && type === 'section') {
-        const newSection: Section = { id: uuidv4(), type: 'section', styles: createDefaultStyles(), children: [] };
+    if (draft.children.find(c => c.id === parentId) && type === 'section') {
+        const newSection: Section = { id: uuidv4(), type: 'section', styles: createDefaultStyles(), children: [], visibility: { desktop: true, tablet: true, mobile: true } };
         draft.children.push(newSection);
         return;
     }
@@ -118,12 +130,19 @@ export const addNode = (draft: Page, parentId: string, type: 'section' | 'row' |
 
     switch (type) {
         case 'row':
-            newNode = { id: uuidv4(), type: 'row', styles: createDefaultStyles(), children: [] };
+            newNode = { id: uuidv4(), type: 'row', styles: createDefaultStyles(), children: [], visibility: { desktop: true, tablet: true, mobile: true } };
             (parent as Section).children.push(newNode);
             break;
         case 'column':
-            newNode = { id: uuidv4(), type: 'column', styles: createDefaultStyles(), children: [] };
+            newNode = { id: uuidv4(), type: 'column', styles: { desktop: { flexBasis: '100%'}, tablet: {}, mobile: {} }, children: [], visibility: { desktop: true, tablet: true, mobile: true } };
              (parent as Row).children.push(newNode);
+             // When adding a column, adjust siblings' flexBasis if needed
+             const numCols = (parent as Row).children.length;
+             const basis = `${100 / numCols}%`;
+             (parent as Row).children.forEach(col => {
+                if(!col.styles.desktop) col.styles.desktop = {};
+                col.styles.desktop.flexBasis = basis;
+             });
             break;
         default: // Element types
              newNode = createDefaultElement(type);
@@ -190,7 +209,7 @@ const validChildrenMap: Record<string, string[]> = {
     page: ['section'], // Page is the new root
     section: ['row'],
     row: ['column'],
-    column: ['headline', 'text', 'image', 'button', 'spacer', 'icon', 'video', 'form', 'embed'],
+    column: ['headline', 'text', 'image', 'button', 'spacer', 'icon', 'video', 'form', 'embed', 'navigation', 'gallery', 'divider', 'map'],
 };
 
 export const moveNode = (root: WebsiteNode[], sourceId: string, targetId: string, position: 'before' | 'after') => {

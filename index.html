@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Gen-Z Builder</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link id="google-font-link" rel="stylesheet" href="">
+    <style id="dynamic-styles"></style>
     <script>
       tailwind.config = {
         theme: {
@@ -70,6 +72,7 @@
         align-items: flex-start;
         padding: 2rem;
         overflow: auto;
+        position: relative;
       }
       .preview-canvas {
          width: 100%;
@@ -97,7 +100,8 @@
 
       /* Sidebar Tabs */
       .sidebar-tabs {
-        display: flex;
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
         border-bottom: 1px solid #e2e8f0;
       }
       .sidebar-tab {
@@ -257,6 +261,59 @@
       .interactive-wrapper.selected [contenteditable="true"] {
         outline: 1px dashed #4f46e5;
         outline-offset: 2px;
+      }
+      
+      /* NEW: Lock Overlay */
+      .lock-overlay {
+        position: absolute;
+        inset: 0;
+        background-color: rgba(165, 180, 252, 0.2);
+        z-index: 15;
+        cursor: not-allowed;
+        pointer-events: all;
+      }
+      .lock-overlay::after {
+        content: '🔒';
+        position: absolute;
+        top: 2px;
+        right: 2px;
+        font-size: 12px;
+        background-color: #4f46e5;
+        color: white;
+        padding: 2px 4px;
+        border-radius: 4px;
+      }
+
+      /* NEW: Quick Add Button */
+      .quick-add-button-wrapper {
+        position: relative;
+      }
+      .quick-add-button {
+        position: absolute;
+        bottom: -18px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 20;
+        display: none;
+      }
+      .quick-add-button-wrapper:hover .quick-add-button {
+        display: block;
+      }
+      .quick-add-button button {
+        background-color: #4f46e5;
+        color: white;
+        border-radius: 9999px;
+        width: 28px;
+        height: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        border: 2px solid white;
+        transition: transform 0.2s;
+      }
+      .quick-add-button button:hover {
+        transform: scale(1.1);
       }
       
       /* NEW: AI Toolbar */
@@ -424,6 +481,14 @@
         opacity: 1;
         transform: translateY(0);
       }
+      
+      /* NEW: Site Navigation Styles */
+      .preview-nav ul { list-style: none; padding: 0; margin: 0; display: flex; gap: 1.5rem; }
+      .preview-nav a { text-decoration: none; color: inherit; font-weight: 500; }
+      
+      /* NEW: Gallery Styles */
+      .preview-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 1rem; }
+      .preview-gallery img { width: 100%; height: 100%; object-fit: cover; aspect-ratio: 1 / 1; }
 
       /* General UI Helpers */
       [contenteditable="false"]::-webkit-resizer { display: none; }

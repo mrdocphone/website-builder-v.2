@@ -1,10 +1,24 @@
 
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
-import type { WebsiteData, Page } from '../types';
+import type { WebsiteData, Page, WebsiteNode } from '../types';
 import Preview from './Preview';
 
+
+// Helper to recursively find all nodes with hover styles
+const findHoverStyles = (nodes: WebsiteNode[]): { id: string; styles: any }[] => {
+    let styles: { id: string; styles: any }[] = [];
+    for (const node of nodes) {
+        if (node.hoverStyles) {
+            styles.push({ id: node.id, styles: node.hoverStyles });
+        }
+        if ('children' in node && Array.isArray(node.children)) {
+            styles = styles.concat(findHoverStyles(node.children as WebsiteNode[]));
+        }
+    }
+    return styles;
+};
 
 const PublishedWebsite: React.FC = () => {
   const { username, slug } = useParams<{ username: string; slug?: string }>();
@@ -61,6 +75,8 @@ const PublishedWebsite: React.FC = () => {
   useEffect(() => {
     if (websiteData && pageData) {
         document.title = pageData.metaTitle || websiteData.name;
+        document.body.style.fontFamily = websiteData.googleFont ? `'${websiteData.googleFont}', sans-serif` : 'sans-serif';
+
         let metaDescription = document.querySelector('meta[name="description"]');
         if (!metaDescription) {
             metaDescription = document.createElement('meta');
@@ -76,8 +92,43 @@ const PublishedWebsite: React.FC = () => {
             document.head.appendChild(favicon);
         }
         favicon.setAttribute('href', websiteData.faviconUrl || '/favicon.ico');
+        
+        // Google Font
+        if (websiteData.googleFont) {
+            const fontLink = document.getElementById('google-font-link') as HTMLLinkElement;
+            if (fontLink) {
+                 fontLink.href = `https://fonts.googleapis.com/css2?family=${websiteData.googleFont.replace(/ /g, '+')}:wght@400;700&display=swap`;
+            }
+        }
     }
   }, [websiteData, pageData]);
+  
+   const dynamicStyles = useMemo(() => {
+    if (!websiteData) return '';
+    const hoverNodes = [
+      ...findHoverStyles(websiteData.header),
+      ...(pageData ? findHoverStyles(pageData.children) : []),
+      ...findHoverStyles(websiteData.footer),
+    ];
+
+    const desktopStyles = hoverNodes.map(({ id, styles }) => `[data-node-id="${id}"]:hover { ${Object.entries(styles.desktop).map(([k, v]) => `${k.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`)}: ${v};`).join(' ')} }`).join('\n');
+    const tabletStyles = hoverNodes.map(({ id, styles }) => `[data-node-id="${id}"]:hover { ${Object.entries(styles.tablet).map(([k, v]) => `${k.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`)}: ${v};`).join(' ')} }`).join('\n');
+    const mobileStyles = hoverNodes.map(({ id, styles }) => `[data-node-id="${id}"]:hover { ${Object.entries(styles.mobile).map(([k, v]) => `${k.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`)}: ${v};`).join(' ')} }`).join('\n');
+
+    return `
+      ${desktopStyles}
+      @media (max-width: 768px) { ${tabletStyles} }
+      @media (max-width: 375px) { ${mobileStyles} }
+    `;
+  }, [websiteData, pageData]);
+  
+  useEffect(() => {
+    const styleEl = document.getElementById('dynamic-styles');
+    if (styleEl) {
+      styleEl.innerHTML = dynamicStyles;
+    }
+  }, [dynamicStyles]);
+
 
   // Animation effect for published site
   useEffect(() => {
@@ -126,7 +177,7 @@ const PublishedWebsite: React.FC = () => {
   }
 
   return (
-    <div className="w-screen h-screen">
+    <div className="w-screen h-screen" style={{ cursor: websiteData.customCursor || 'default' }}>
       <Preview websiteData={websiteData} activePage={pageData} />
     </div>
   );

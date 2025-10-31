@@ -6,10 +6,11 @@ import { PlusIcon } from './icons';
 interface GlobalSettingsFormProps {
   websiteData: WebsiteData;
   setWebsiteData: Updater<WebsiteData | null>;
-  onAddSection: () => void;
+  onAddSection: (context: 'page' | 'header' | 'footer') => void;
+  onSetEditingContext: (context: 'page' | 'header' | 'footer') => void;
 }
 
-const GlobalSettingsForm: React.FC<GlobalSettingsFormProps> = ({ websiteData, setWebsiteData, onAddSection }) => {
+const GlobalSettingsForm: React.FC<GlobalSettingsFormProps> = ({ websiteData, setWebsiteData, onAddSection, onSetEditingContext }) => {
   const handleInputChange = (field: keyof WebsiteData, value: string) => {
     setWebsiteData(draft => {
       if (draft) {
@@ -40,8 +41,18 @@ const GlobalSettingsForm: React.FC<GlobalSettingsFormProps> = ({ websiteData, se
       {id: 'forest', name: 'Forest'},
   ];
 
+  const googleFonts = [ 'Roboto', 'Open Sans', 'Lato', 'Montserrat', 'Oswald', 'Source Sans Pro', 'Raleway', 'Poppins', 'Nunito', 'Merriweather' ];
+  const customCursors = [ 'default', 'pointer', 'text', 'wait', 'help', 'crosshair', 'move', 'grab', 'zoom-in', 'zoom-out' ];
+
   return (
     <div className="p-4 space-y-6">
+       <div>
+          <h3 className="text-lg font-semibold mb-2 text-slate-700">Global Regions</h3>
+           <div className="grid grid-cols-2 gap-2">
+              <button onClick={() => onSetEditingContext('header')} className="p-3 bg-slate-50 border rounded-md text-slate-700 font-medium hover:bg-slate-100 hover:border-slate-300">Edit Header</button>
+              <button onClick={() => onSetEditingContext('footer')} className="p-3 bg-slate-50 border rounded-md text-slate-700 font-medium hover:bg-slate-100 hover:border-slate-300">Edit Footer</button>
+           </div>
+       </div>
       <div>
         <h3 className="text-lg font-semibold mb-2 text-slate-700">Global Settings</h3>
         <div className="space-y-4">
@@ -73,6 +84,23 @@ const GlobalSettingsForm: React.FC<GlobalSettingsFormProps> = ({ websiteData, se
         </div>
       </div>
       <div>
+        <h3 className="text-lg font-semibold mb-2 text-slate-700">Global Styling</h3>
+         <div className="space-y-4">
+             <div>
+                <label className="text-sm font-medium text-slate-600 block mb-1">Google Font</label>
+                <select value={websiteData.googleFont || 'Roboto'} onChange={e => handleInputChange('googleFont', e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm">
+                    {googleFonts.map(font => <option key={font} value={font}>{font}</option>)}
+                </select>
+             </div>
+              <div>
+                <label className="text-sm font-medium text-slate-600 block mb-1">Cursor Style</label>
+                <select value={websiteData.customCursor || 'default'} onChange={e => handleInputChange('customCursor', e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm">
+                    {customCursors.map(cursor => <option key={cursor} value={cursor}>{cursor}</option>)}
+                </select>
+             </div>
+         </div>
+      </div>
+      <div>
         <h3 className="text-lg font-semibold mb-2 text-slate-700">Global Colors</h3>
         <div className="grid grid-cols-2 gap-4">
             {/* FIX: Corrected the type assertion for Object.keys to match the expected type in handlePaletteChange, ensuring type safety. */}
@@ -98,10 +126,6 @@ const GlobalSettingsForm: React.FC<GlobalSettingsFormProps> = ({ websiteData, se
             />
           </div>
         </div>
-      </div>
-      <div>
-        <h3 className="text-lg font-semibold mb-2 text-slate-700">Content Sections</h3>
-        <p className="text-sm text-slate-500 mb-2">To add sections, select a page and use the "Layers" panel.</p>
       </div>
     </div>
   );

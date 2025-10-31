@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { produce } from 'immer';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -13,10 +14,12 @@ import StylePanel from './SectionEditorForm';
 import Preview from './Preview';
 import PublishModal from './PublishModal';
 // FIX: Import DuplicateIcon.
-import { DesktopIcon, TabletIcon, MobileIcon, LayersIcon, PlusIcon as ComponentIcon, SettingsIcon, PencilIcon, TrashIcon, VideoIcon, StarIcon, CheckIcon, HeartIcon, UndoIcon, RedoIcon, CopyIcon, PasteIcon, FormIcon, EmbedIcon, MagicWandIcon, HomeIcon, PageSettingsIcon, DuplicateIcon } from './icons';
+import { DesktopIcon, TabletIcon, MobileIcon, LayersIcon, PlusIcon as ComponentIcon, SettingsIcon, PencilIcon, TrashIcon, VideoIcon, StarIcon, CheckIcon, HeartIcon, UndoIcon, RedoIcon, CopyIcon, PasteIcon, FormIcon, EmbedIcon, MagicWandIcon, HomeIcon, PageSettingsIcon, DuplicateIcon, ColumnIcon, LockIcon, UnlockIcon, LayoutIcon } from './icons';
 import ContextMenu from './ContextMenu';
+import SectionTemplatesPanel from './SectionTemplatesPanel';
 
 type DropPosition = 'top' | 'bottom';
+type EditingContext = 'page' | 'header' | 'footer';
 
 // Custom hook for state management with undo/redo
 const useHistoryState = <T,>(initialState: T) => {
@@ -113,7 +116,9 @@ const PageSettingsModal: React.FC<{
 const EditorTopBar: React.FC<{
   websiteName: string;
   device: Device;
+  editingContext: EditingContext;
   onSetDevice: (device: Device) => void;
+  onSetEditingContext: (context: EditingContext) => void;
   onPublish: () => void;
   isSaving: boolean;
   lastSaved: Date | null;
@@ -121,7 +126,7 @@ const EditorTopBar: React.FC<{
   onRedo: () => void;
   canUndo: boolean;
   canRedo: boolean;
-}> = ({ websiteName, device, onSetDevice, onPublish, isSaving, lastSaved, onUndo, onRedo, canUndo, canRedo }) => {
+}> = ({ websiteName, device, editingContext, onSetDevice, onSetEditingContext, onPublish, isSaving, lastSaved, onUndo, onRedo, canUndo, canRedo }) => {
   const navigate = useNavigate();
   const deviceOptions: { id: Device; icon: React.FC<any> }[] = [ { id: 'desktop', icon: DesktopIcon }, { id: 'tablet', icon: TabletIcon }, { id: 'mobile', icon: MobileIcon } ];
   return (
@@ -129,6 +134,14 @@ const EditorTopBar: React.FC<{
       <div className="flex items-center gap-4">
         <button onClick={() => navigate('/dashboard')} className="text-slate-600 hover:text-indigo-600"> &larr; Back </button>
         <h1 className="text-lg font-semibold text-slate-800">{websiteName}</h1>
+         {editingContext !== 'page' && (
+             <div className="flex items-center gap-2">
+                 <span className="text-sm font-medium text-indigo-600 bg-indigo-100 px-2 py-1 rounded-md">
+                    Editing {editingContext.charAt(0).toUpperCase() + editingContext.slice(1)}
+                 </span>
+                 <button onClick={() => onSetEditingContext('page')} className="text-sm text-slate-500 hover:underline">Exit</button>
+             </div>
+         )}
       </div>
        <div className="flex items-center gap-4">
         <div className="flex items-center gap-1">
@@ -149,7 +162,7 @@ const EditorTopBar: React.FC<{
 
 // ... LayersPanel, AddPanel etc ...
 // FIX: Changed copiedNodeId prop to copiedStyles to correctly reflect the data being passed.
-const LayerItem: React.FC<any> = ({ node, selectedNodeId, copiedStyles, generatingSectionId, onSelectNode, onDeleteNode, onDuplicateNode, onMoveNode, onCopyStyles, onPasteStyles, onGenerateSectionContent }) => {
+const LayerItem: React.FC<any> = ({ node, selectedNodeId, copiedStyles, generatingSectionId, onSelectNode, onDeleteNode, onDuplicateNode, onMoveNode, onCopyStyles, onPasteStyles, onGenerateSectionContent, onToggleLock, onAddNode }) => {
     const isSelected = selectedNodeId === node.id;
     const [dropPosition, setDropPosition] = useState<DropPosition | null>(null);
     const handleDragStart = (e: React.DragEvent) => { e.dataTransfer.setData('text/plain', node.id); e.dataTransfer.effectAllowed = 'move'; };
@@ -159,18 +172,24 @@ const LayerItem: React.FC<any> = ({ node, selectedNodeId, copiedStyles, generati
     const isGenerating = generatingSectionId === node.id;
     return (
         <div className="layer-item-wrapper">
-            <div draggable onDragStart={handleDragStart} onDragOver={handleDragOver} onDragLeave={() => setDropPosition(null)} onDrop={handleDrop} className={`layer-item ${isSelected ? 'selected' : ''} ${getIndicatorClass()}`} onClick={(e) => { e.stopPropagation(); onSelectNode(node.id); }}>
+            <div draggable={!node.locked} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragLeave={() => setDropPosition(null)} onDrop={handleDrop} className={`layer-item ${isSelected ? 'selected' : ''} ${getIndicatorClass()}`} onClick={(e) => { e.stopPropagation(); onSelectNode(node.id); }}>
                 <div className="layer-item-content"> <span className="layer-item-icon">&#x25A1;</span> <span>{node.type}</span> {isGenerating && <div className="dashboard-spinner !w-4 !h-4 !border-2 ml-2"></div>} </div>
-                 {/* FIX: Changed disabled check from !copiedNodeId to !copiedStyles. */}
-                 <div className="flex items-center ml-auto opacity-50 hover:opacity-100 transition-opacity"> {node.type === 'section' && <button onClick={(e) => { e.stopPropagation(); onGenerateSectionContent(node.id); }} title="Generate Content with AI" className="text-slate-500 hover:text-indigo-600 px-1 disabled:text-slate-300" disabled={isGenerating}><MagicWandIcon className="w-4 h-4" /></button>} <button onClick={(e) => { e.stopPropagation(); onCopyStyles(node.id); }} title="Copy Styles" className="text-slate-500 hover:text-indigo-600 px-1"><CopyIcon className="w-4 h-4" /></button> <button onClick={(e) => { e.stopPropagation(); onPasteStyles(node.id); }} title="Paste Styles" disabled={!copiedStyles} className="text-slate-500 hover:text-indigo-600 px-1 disabled:text-slate-300"><PasteIcon className="w-4 h-4" /></button> <button onClick={(e) => { e.stopPropagation(); onDuplicateNode(node.id); }} title="Duplicate" className="text-slate-500 hover:text-indigo-600 px-1"><DuplicateIcon className="w-4 h-4" /></button> <button onClick={(e) => { e.stopPropagation(); onDeleteNode(node.id); }} title="Delete" className="text-slate-500 hover:text-red-600 px-1"><TrashIcon className="w-4 h-4" /></button> </div>
+                 <div className="flex items-center ml-auto opacity-50 hover:opacity-100 transition-opacity"> 
+                    {node.type === 'section' && <button onClick={(e) => { e.stopPropagation(); onGenerateSectionContent(node.id); }} title="Generate Content with AI" className="text-slate-500 hover:text-indigo-600 px-1 disabled:text-slate-300" disabled={isGenerating}><MagicWandIcon className="w-4 h-4" /></button>} 
+                    {node.type === 'row' && <button onClick={(e) => { e.stopPropagation(); onAddNode('column', node.id); }} title="Add Column" className="text-slate-500 hover:text-indigo-600 px-1"><ColumnIcon className="w-4 h-4" /></button>}
+                    <button onClick={(e) => { e.stopPropagation(); onCopyStyles(node.id); }} title="Copy Styles" className="text-slate-500 hover:text-indigo-600 px-1"><CopyIcon className="w-4 h-4" /></button>
+                    <button onClick={(e) => { e.stopPropagation(); onPasteStyles(node.id); }} title="Paste Styles" disabled={!copiedStyles} className="text-slate-500 hover:text-indigo-600 px-1 disabled:text-slate-300"><PasteIcon className="w-4 h-4" /></button>
+                    <button onClick={(e) => { e.stopPropagation(); onDuplicateNode(node.id); }} title="Duplicate" className="text-slate-500 hover:text-indigo-600 px-1"><DuplicateIcon className="w-4 h-4" /></button>
+                    <button onClick={(e) => { e.stopPropagation(); onToggleLock(node.id); }} title={node.locked ? "Unlock" : "Lock"} className="text-slate-500 hover:text-indigo-600 px-1">{node.locked ? <UnlockIcon className="w-4 h-4" /> : <LockIcon className="w-4 h-4" />}</button>
+                    <button onClick={(e) => { e.stopPropagation(); onDeleteNode(node.id); }} title="Delete" className="text-slate-500 hover:text-red-600 px-1"><TrashIcon className="w-4 h-4" /></button>
+                 </div>
             </div>
-            {/* FIX: Passed copiedStyles to recursive LayerItem call. */}
-            {'children' in node && Array.isArray(node.children) && node.children.length > 0 && ( <div className="layer-children"> {node.children.map(child => <LayerItem key={child.id} node={child as WebsiteNode} {...{selectedNodeId, copiedStyles, generatingSectionId, onSelectNode, onDeleteNode, onDuplicateNode, onMoveNode, onCopyStyles, onPasteStyles, onGenerateSectionContent}} />)} </div> )}
+            {'children' in node && Array.isArray(node.children) && node.children.length > 0 && ( <div className="layer-children"> {node.children.map(child => <LayerItem key={child.id} node={child as WebsiteNode} {...{selectedNodeId, copiedStyles, generatingSectionId, onSelectNode, onDeleteNode, onDuplicateNode, onMoveNode, onCopyStyles, onPasteStyles, onGenerateSectionContent, onToggleLock, onAddNode}} />)} </div> )}
         </div>
     )
 }
 const AddPanel: React.FC<{ onAddElement: (type: ElementType) => void }> = ({ onAddElement }) => {
-  const elements: { type: ElementType, label: string, icon: React.FC<any> }[] = [ { type: 'headline', label: 'Headline', icon: PencilIcon }, { type: 'text', label: 'Text', icon: PencilIcon }, { type: 'button', label: 'Button', icon: PencilIcon }, { type: 'image', label: 'Image', icon: PencilIcon }, { type: 'spacer', label: 'Spacer', icon: CheckIcon }, { type: 'video', label: 'Video', icon: VideoIcon }, { type: 'icon', label: 'Icon', icon: StarIcon }, { type: 'form', label: 'Form', icon: FormIcon }, { type: 'embed', label: 'Embed', icon: EmbedIcon }, ];
+  const elements: { type: ElementType, label: string, icon: React.FC<any> }[] = [ { type: 'headline', label: 'Headline', icon: PencilIcon }, { type: 'text', label: 'Text', icon: PencilIcon }, { type: 'button', label: 'Button', icon: PencilIcon }, { type: 'image', label: 'Image', icon: PencilIcon }, { type: 'spacer', label: 'Spacer', icon: CheckIcon }, { type: 'video', label: 'Video', icon: VideoIcon }, { type: 'icon', label: 'Icon', icon: StarIcon }, { type: 'form', label: 'Form', icon: FormIcon }, { type: 'embed', label: 'Embed', icon: EmbedIcon }, { type: 'navigation', label: 'Navigation', icon: MagicWandIcon }, { type: 'gallery', label: 'Gallery', icon: MagicWandIcon }, { type: 'divider', label: 'Divider', icon: MagicWandIcon }, { type: 'map', label: 'Map', icon: MagicWandIcon }, ];
   return ( <div className="add-element-grid"> {elements.map(el => ( <button key={el.type} onClick={() => onAddElement(el.type)} className="add-element-button"> <el.icon className="w-6 h-6" /> <span>{el.label}</span> </button> ))} </div> );
 };
 
@@ -188,8 +207,9 @@ const Editor: React.FC<{session: Session}> = ({ session }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'pages' | 'add' | 'style' | 'settings'>('pages');
+  const [activeTab, setActiveTab] = useState<'pages' | 'add' | 'templates' | 'style' | 'settings'>('pages');
   const [device, setDevice] = useState<Device>('desktop');
+  const [editingContext, setEditingContext] = useState<EditingContext>('page');
   const [copiedStyles, setCopiedStyles] = useState<ResponsiveStyles | null>(null);
   const [generatingSectionId, setGeneratingSectionId] = useState<string | null>(null);
   const [editingPage, setEditingPage] = useState<Page | null>(null);
@@ -232,14 +252,41 @@ const Editor: React.FC<{session: Session}> = ({ session }) => {
       }
   }, [handleCloseContextMenu]);
   
+   useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+        if (!selectedNodeId) return;
+
+        // Delete node
+        if (e.key === 'Delete' || e.key === 'Backspace') {
+            const activeEl = document.activeElement;
+            if (activeEl?.hasAttribute('contenteditable') && activeEl?.getAttribute('contenteditable') === 'true') {
+                return; // Don't delete node if user is typing
+            }
+            e.preventDefault();
+            handleDeleteNode(selectedNodeId);
+        }
+
+        // Duplicate node
+        if ((e.metaKey || e.ctrlKey) && e.key === 'd') {
+            e.preventDefault();
+            handleDuplicateNode(selectedNodeId);
+        }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedNodeId]);
+  
+  
   const handleContextMenuRequest = (e: React.MouseEvent, nodeId: string) => {
       e.preventDefault();
       e.stopPropagation();
       setContextMenu({ x: e.clientX, y: e.clientY, nodeId });
   };
-
+  
   const activePage = websiteData?.pages.find(p => p.id === activePageId);
-  const selectedNode = activePage && selectedNodeId ? findNodeById(activePage.children, selectedNodeId) : null;
+  const contentTree = editingContext === 'page' ? activePage?.children : websiteData?.[editingContext];
+  const selectedNode = contentTree && selectedNodeId ? findNodeById(contentTree, selectedNodeId) : null;
+
 
   const saveTimer = useRef<number | null>(null);
   useEffect(() => {
@@ -259,60 +306,93 @@ const Editor: React.FC<{session: Session}> = ({ session }) => {
     }
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
   }, [websiteData, websiteId]);
-
+  
   const handleUpdateNode = useCallback((id: string, updates: Partial<WebsiteNode>) => {
-    if (!activePageId) return;
     setWebsiteData(draft => {
-      if (!draft) return;
-      const page = draft.pages.find(p => p.id === activePageId);
-      if (page) updateNodeById(page.children, id, updates);
+        if (!draft) return;
+        const tree = editingContext === 'page' ? draft.pages.find(p => p.id === activePageId)?.children : draft[editingContext];
+        if (tree) updateNodeById(tree, id, updates);
     });
-  }, [setWebsiteData, activePageId]);
+  }, [setWebsiteData, activePageId, editingContext]);
+
 
   const handleDeleteNode = useCallback((id: string) => {
-    if (!activePageId) return;
     setWebsiteData(draft => {
-      if (!draft) return;
-      const page = draft.pages.find(p => p.id === activePageId);
-      if (page) {
-        if (removeNodeById(page.children, id)) {
-          setSelectedNodeId(null);
-          setActiveTab('pages');
+        if (!draft) return;
+        const tree = editingContext === 'page' ? draft.pages.find(p => p.id === activePageId)?.children : draft[editingContext];
+        if (tree && removeNodeById(tree, id)) {
+            setSelectedNodeId(null);
+            setActiveTab('pages');
         }
-      }
     });
-  }, [setWebsiteData, activePageId]);
+  }, [setWebsiteData, activePageId, editingContext]);
 
   const handleAddElement = useCallback((type: ElementType) => {
-    if (!selectedNodeId || !activePageId) { alert("Please select a column to add the element to."); return; }
+    if (!selectedNodeId) { alert("Please select a column to add the element to."); return; }
     
     setWebsiteData(draft => {
         if (!draft) return;
-        const page = draft.pages.find(p => p.id === activePageId);
-        if (!page) return;
 
-        const parentNode = findNodeById(page.children, selectedNodeId);
-        const targetParentId = (parentNode && parentNode.type === 'column') ? parentNode.id : null; // Simplified logic, needs improvement
+        // FIX: The object passed to tree utility functions must conform to `{ children: WebsiteNode[] }`.
+        // For 'header' and 'footer', we create a temporary wrapper that Immer can work with.
+        let container: { children: WebsiteNode[] };
+        if (editingContext === 'page') {
+            const page = draft.pages.find(p => p.id === activePageId);
+            if (!page) return;
+            container = page;
+        } else {
+            container = { children: draft[editingContext] };
+        }
+
+        const parentNode = findNodeById(container.children, selectedNodeId);
+        const targetParentId = (parentNode && parentNode.type === 'column') ? parentNode.id : null;
         
         if (targetParentId) {
-            addNode(page, targetParentId, type);
+            addNode(container, targetParentId, type);
+            // If we used a temporary wrapper, we must assign the mutated children array back to the draft.
+            if (editingContext !== 'page') {
+                draft[editingContext] = container.children as Section[];
+            }
         } else {
             alert("Elements can only be added inside columns.");
         }
     });
-  }, [selectedNodeId, setWebsiteData, activePageId]);
+  }, [selectedNodeId, setWebsiteData, activePageId, editingContext]);
   
-  const handleAddSection = useCallback(() => {
-      if (!activePageId) return;
+  const handleAddNode = useCallback((type: 'column' | 'section', parentId?: string) => {
       setWebsiteData(draft => {
           if (!draft) return;
-          const page = draft.pages.find(p => p.id === activePageId);
-          if (!page) return;
-          // Create a default section with one row and one column
-          const newColumn: Element[] = [];
-          const newRow = { id: uuidv4(), type: 'row' as const, styles: { desktop: {}, tablet: {}, mobile: {} }, children: [{ id: uuidv4(), type: 'column' as const, styles: { desktop: {}, tablet: {}, mobile: {} }, children: newColumn }]};
-          const newSection = { id: uuidv4(), type: 'section' as const, styles: { desktop: { paddingTop: '2rem', paddingBottom: '2rem'}, tablet: {}, mobile: {} }, children: [newRow] };
-          page.children.push(newSection);
+          // FIX: The object passed to tree utility functions must conform to `{ children: WebsiteNode[] }`.
+          // For 'header' and 'footer', we create a temporary wrapper that Immer can work with.
+          let container: { children: WebsiteNode[] } & { id?: string };
+          if (editingContext === 'page') {
+            const page = draft.pages.find(p => p.id === activePageId);
+            if (!page) return;
+            container = page;
+          } else {
+            container = { children: draft[editingContext] };
+          }
+          
+          if (type === 'section') {
+             addNode(container, container.id || '', 'section');
+          } else if (type === 'column' && parentId) {
+              addNode(container, parentId, 'column');
+          }
+
+          // If we used a temporary wrapper, we must assign the mutated children array back to the draft.
+          if (editingContext !== 'page') {
+            draft[editingContext] = container.children as Section[];
+          }
+      });
+  }, [activePageId, setWebsiteData, editingContext]);
+  
+  const handleAddSection = useCallback((context: 'page' | 'header' | 'footer') => {
+      setWebsiteData(draft => {
+          if (!draft) return;
+          const target = context === 'page' ? draft.pages.find(p => p.id === activePageId) : draft;
+          if (!target) return;
+          const newSection: Section = { id: uuidv4(), type: 'section', styles: { desktop: { paddingTop: '2rem', paddingBottom: '2rem'}, tablet: {}, mobile: {} }, children: [ { id: uuidv4(), type: 'row', styles: { desktop: {}, tablet: {}, mobile: {} }, children: [{ id: uuidv4(), type: 'column', styles: { desktop: {flexBasis: '100%'}, tablet: {}, mobile: {} }, children: [] }] } ] };
+          target[context === 'page' ? 'children' : context].push(newSection);
           setSelectedNodeId(newSection.id);
           setActiveTab('style');
       });
@@ -324,20 +404,18 @@ const Editor: React.FC<{session: Session}> = ({ session }) => {
   }, []);
   
   const handleMoveNode = useCallback((sourceId: string, targetId: string, position: 'top' | 'bottom') => {
-      if (!activePageId) return;
       setWebsiteData(draft => {
           if (!draft) return;
-          const page = draft.pages.find(p => p.id === activePageId);
-          if (page) moveNode(page.children, sourceId, targetId, position === 'top' ? 'before' : 'after');
+          const tree = editingContext === 'page' ? draft.pages.find(p => p.id === activePageId)?.children : draft[editingContext];
+          if (tree) moveNode(tree, sourceId, targetId, position === 'top' ? 'before' : 'after');
       });
-  }, [activePageId, setWebsiteData]);
+  }, [editingContext, activePageId, setWebsiteData]);
   
   const handleCopyStyles = (nodeId: string) => {
-      if (!activePage) return;
-      const node = findNodeById(activePage.children, nodeId);
+      if (!contentTree) return;
+      const node = findNodeById(contentTree, nodeId);
       if (node) {
           setCopiedStyles(node.styles);
-          // Optional: show a toast/notification "Styles copied!"
       }
   };
   
@@ -348,31 +426,36 @@ const Editor: React.FC<{session: Session}> = ({ session }) => {
   };
   
   const handleDuplicateNode = useCallback((nodeId: string) => {
-       if (!activePageId) return;
         setWebsiteData(draft => {
           if (!draft) return;
-          const page = draft.pages.find(p => p.id === activePageId);
-          if (page) duplicateNodeById(page.children, nodeId);
+          const tree = editingContext === 'page' ? draft.pages.find(p => p.id === activePageId)?.children : draft[editingContext];
+          if (tree) duplicateNodeById(tree, nodeId);
         });
-  }, [activePageId, setWebsiteData]);
+  }, [editingContext, activePageId, setWebsiteData]);
+  
+  const handleToggleLock = (nodeId: string) => {
+      if (!contentTree) return;
+      const node = findNodeById(contentTree, nodeId);
+      if (node) {
+          handleUpdateNode(nodeId, { locked: !node.locked });
+      }
+  }
 
   const handleGenerateSectionContent = async (sectionId: string) => {
       if (!websiteData || !activePage) return;
-      const sectionNode = findNodeById(activePage.children, sectionId) as Section;
+      const sectionNode = findNodeById(contentTree || [], sectionId) as Section;
       if (!sectionNode || sectionNode.type !== 'section') {
           alert("Content can only be generated for a 'section'.");
           return;
       }
       setGeneratingSectionId(sectionId);
       try {
-          // Pass the tagline of the active page for better context.
           const generatedColumns = await generateSectionContent(websiteData, activePage.tagline, sectionNode);
           handleUpdateNode(sectionId, { 
               children: sectionNode.children.map((row, rowIndex) => ({
                   ...row,
                   children: row.children.map((col, colIndex) => ({
                       ...col,
-                      // FIX: The API returns elements directly, not wrapped in a content property.
                       children: generatedColumns[colIndex]?.map(el => ({
                           id: uuidv4(),
                           type: el.type,
@@ -402,7 +485,7 @@ const Editor: React.FC<{session: Session}> = ({ session }) => {
   
   const handleAiTextUpdate = async (nodeId: string, action: string, options?: { tone?: string }) => {
       if (!activePage) return;
-      const node = findNodeById(activePage.children, nodeId) as Element;
+      const node = findNodeById(contentTree || [], nodeId) as Element;
       if (!node || !('content' in node) || !('text' in node.content)) return;
 
       const textContent = (node.content as any).text.replace(/<[^>]*>?/gm, '');
@@ -433,11 +516,11 @@ const Editor: React.FC<{session: Session}> = ({ session }) => {
 
   return (
     <div className="editor-container">
-      <EditorTopBar websiteName={websiteData.name} device={device} onSetDevice={setDevice} onPublish={() => setIsPublishModalOpen(true)} isSaving={isSaving} lastSaved={lastSaved} onUndo={undo} onRedo={redo} canUndo={canUndo} canRedo={canRedo} />
+      <EditorTopBar websiteName={websiteData.name} device={device} editingContext={editingContext} onSetDevice={setDevice} onSetEditingContext={setEditingContext} onPublish={() => setIsPublishModalOpen(true)} isSaving={isSaving} lastSaved={lastSaved} onUndo={undo} onRedo={redo} canUndo={canUndo} canRedo={canRedo} />
       <div className="editor-main">
         <aside className="editor-sidebar">
           <div className="sidebar-tabs">
-             {[{id: 'pages', icon: LayersIcon, label: 'Layers'}, {id: 'add', icon: ComponentIcon, label: 'Add'}, {id: 'style', icon: SettingsIcon, label: 'Style'}, {id: 'settings', icon: SettingsIcon, label: 'Global'}].map(tab => (
+             {[{id: 'pages', icon: LayersIcon, label: 'Layers'}, {id: 'add', icon: ComponentIcon, label: 'Add'}, {id: 'templates', icon: LayoutIcon, label: 'Templates'}, {id: 'style', icon: SettingsIcon, label: 'Style'}, {id: 'settings', icon: SettingsIcon, label: 'Global'}].map(tab => (
                  <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`sidebar-tab ${activeTab === tab.id ? 'active' : ''}`} disabled={tab.id === 'style' && !selectedNodeId}>
                     <tab.icon className="w-5 h-5" /> {tab.label}
                  </button>
@@ -448,7 +531,6 @@ const Editor: React.FC<{session: Session}> = ({ session }) => {
                 <div className="p-2">
                     <div className="flex items-center justify-between p-2">
                         <h3 className="font-semibold">Pages</h3>
-                        {/* <button className="text-indigo-600"><PlusIcon className="w-4 h-4" /></button> */}
                     </div>
                      <div className="space-y-1">
                      {websiteData.pages.map(page => (
@@ -462,17 +544,18 @@ const Editor: React.FC<{session: Session}> = ({ session }) => {
                      ))}
                      </div>
                      <hr className="my-2" />
-                     {activePage.children.map(child => <LayerItem key={child.id} node={child} selectedNodeId={selectedNodeId} copiedStyles={copiedStyles} generatingSectionId={generatingSectionId} onSelectNode={handleSelectNode} onDeleteNode={handleDeleteNode} onDuplicateNode={handleDuplicateNode} onMoveNode={handleMoveNode} onCopyStyles={handleCopyStyles} onPasteStyles={handlePasteStyles} onGenerateSectionContent={handleGenerateSectionContent} />)}
+                     {contentTree?.map(child => <LayerItem key={child.id} node={child} selectedNodeId={selectedNodeId} copiedStyles={copiedStyles} generatingSectionId={generatingSectionId} onSelectNode={handleSelectNode} onDeleteNode={handleDeleteNode} onDuplicateNode={handleDuplicateNode} onMoveNode={handleMoveNode} onCopyStyles={handleCopyStyles} onPasteStyles={handlePasteStyles} onGenerateSectionContent={handleGenerateSectionContent} onToggleLock={handleToggleLock} onAddNode={handleAddNode}/>)}
                 </div>
              )}
              {activeTab === 'add' && <AddPanel onAddElement={handleAddElement} />}
+             {activeTab === 'templates' && <SectionTemplatesPanel onAddSection={handleAddSection} />}
              {activeTab === 'style' && selectedNode && ( <StylePanel key={selectedNode.id} node={selectedNode} websiteData={websiteData} onUpdate={handleUpdateNode} /> )}
-             {activeTab === 'settings' && <GlobalSettingsForm websiteData={websiteData} setWebsiteData={setWebsiteData} onAddSection={handleAddSection} />}
+             {activeTab === 'settings' && <GlobalSettingsForm websiteData={websiteData} setWebsiteData={setWebsiteData} onAddSection={handleAddSection} onSetEditingContext={setEditingContext} />}
           </div>
         </aside>
         <main className="editor-preview-wrapper" onClick={() => setSelectedNodeId(null)}>
             <div className={`preview-canvas preview-canvas-${device}`}>
-                <Preview websiteData={websiteData} activePage={activePage} interactive device={device} selectedNodeId={selectedNodeId} hoveredNodeId={hoveredNodeId} onSelectNode={handleSelectNode} onHoverNode={setHoveredNodeId} onUpdateNode={handleUpdateNode} onAiTextUpdate={handleAiTextUpdate} isAiLoading={isAiLoading} onContextMenuRequest={handleContextMenuRequest}/>
+                <Preview websiteData={websiteData} activePage={activePage} interactive device={device} selectedNodeId={selectedNodeId} hoveredNodeId={hoveredNodeId} onSelectNode={handleSelectNode} onHoverNode={setHoveredNodeId} onUpdateNode={handleUpdateNode} onAiTextUpdate={handleAiTextUpdate} isAiLoading={isAiLoading} onContextMenuRequest={handleContextMenuRequest} onAddSection={handleAddSection}/>
             </div>
         </main>
       </div>

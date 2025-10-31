@@ -1,6 +1,7 @@
 
+
 import React, { useMemo } from 'react';
-import type { WebsiteData, ThemeConfig, Theme, WebsiteNode, Element as IElement, HeadlineElement, TextElement, ImageElement, ButtonElement, VideoElement, IconElement, Column, Device, ResponsiveStyles, StyleProperties, EmbedElement, FormElement, Page } from '../types';
+import type { WebsiteData, ThemeConfig, Theme, WebsiteNode, Element as IElement, HeadlineElement, TextElement, ImageElement, ButtonElement, VideoElement, IconElement, Column, Device, ResponsiveStyles, StyleProperties, EmbedElement, FormElement, Page, NavigationElement, GalleryElement, DividerElement, MapElement } from '../types';
 import { PlusIcon, availableIcons, IconRenderer as Icon } from './icons';
 import AiToolbar from './AiToolbar';
 import RichTextToolbar from './RichTextToolbar';
@@ -18,6 +19,7 @@ interface PreviewProps {
   onAiTextUpdate?: (nodeId: string, action: string, options?: { tone?: string }) => void;
   isAiLoading?: boolean;
   onContextMenuRequest?: (e: React.MouseEvent, nodeId: string) => void;
+  onAddSection?: (context: 'page' | 'header' | 'footer') => void;
 }
 
 const themeConfigs: Record<Theme, ThemeConfig> = {
@@ -46,19 +48,17 @@ const mergeStylesForDevice = (styles: ResponsiveStyles, device: Device): StylePr
 const ElementRenderer: React.FC<{ 
     element: IElement, 
     theme: ThemeConfig,
+    websiteData: WebsiteData,
     interactive?: boolean;
     onUpdateNode?: (id: string, updates: Partial<WebsiteNode>) => void;
-}> = React.memo(({ element, theme, interactive, onUpdateNode }) => {
+}> = React.memo(({ element, theme, websiteData, interactive, onUpdateNode }) => {
     if (!element.content || typeof element.content !== 'object') {
-        return null;
+         if (element.type !== 'divider' && element.type !== 'navigation' && element.type !== 'spacer') return null;
     }
 
     const handleContentInput = (e: React.FormEvent<HTMLElement>) => {
         if (!interactive || !onUpdateNode) return;
         const newHtml = e.currentTarget.innerHTML;
-        // The state update is now handled by the input event listener.
-        // This is a "controlled" component in a sense.
-        // The parent component will re-render this with the new HTML.
         onUpdateNode(element.id, { content: { ...(element as any).content, text: newHtml } });
     };
   
@@ -76,7 +76,7 @@ const ElementRenderer: React.FC<{
         case 'image': {
             const { src, alt } = element.content as ImageElement['content'];
             if (!src) { return null; }
-            return <img src={src} alt={alt || ''} className="max-w-full h-auto rounded-md" />;
+            return <img src={src} alt={alt || ''} className="max-w-full h-auto" />;
         }
         case 'button': {
             const { text, href } = element.content as ButtonElement['content'];
@@ -136,6 +136,34 @@ const ElementRenderer: React.FC<{
             const { html } = element.content as EmbedElement['content'];
             return <div dangerouslySetInnerHTML={{ __html: html }} />;
         }
+        case 'navigation': {
+            return (
+                <nav className="preview-nav w-full">
+                    <ul>
+                        {websiteData.pages.map(page => (
+                            <li key={page.id}><a href={`/${page.slug}`}>{page.name}</a></li>
+                        ))}
+                    </ul>
+                </nav>
+            )
+        }
+        case 'gallery': {
+            const { images } = element.content as GalleryElement['content'];
+            return (
+                <div className="preview-gallery">
+                    {images.map((img, idx) => <img key={idx} src={img.src} alt={img.alt} />)}
+                </div>
+            )
+        }
+        case 'divider': { return <hr />; }
+        case 'map': {
+            const { embedUrl } = element.content as MapElement['content'];
+            return (
+                 <div className="aspect-video w-full">
+                    <iframe className="w-full h-full" src={embedUrl} title="Google Map" frameBorder="0" loading="lazy" referrerPolicy="no-referrer-when-downgrade"></iframe>
+                </div>
+            )
+        }
         default:
             return null;
     }
@@ -155,15 +183,17 @@ const InteractiveWrapper: React.FC<React.PropsWithChildren<{
     onContextMenuRequest?: (e: React.MouseEvent, nodeId: string) => void;
 }>> = ({ children, node, interactive, isSelected, isHovered, onSelect, onHover, onUpdateNode, onAiTextUpdate, isAiLoading, onContextMenuRequest }) => {
     if (!interactive) {
-        return <>{children}</>;
+        return <div data-node-id={node.id}>{children}</div>;
     }
 
     const handleClick = (e: React.MouseEvent) => {
+        if (node.locked) return;
         e.stopPropagation();
         onSelect?.(node.id);
     };
 
     const handleMouseEnter = (e: React.MouseEvent) => {
+        if (node.locked) return;
         e.stopPropagation();
         onHover?.(node.id);
     };
@@ -197,7 +227,9 @@ const InteractiveWrapper: React.FC<React.PropsWithChildren<{
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
             onContextMenu={handleContextMenu}
+            data-node-id={node.id}
         >
+            {node.locked && <div className="lock-overlay" />}
             {isSelected && isAiTextElement && onAiTextUpdate && (
                 <AiToolbar 
                     node={node} 
@@ -211,20 +243,44 @@ const InteractiveWrapper: React.FC<React.PropsWithChildren<{
     );
 };
 
-const NodeRenderer: React.FC<Omit<PreviewProps, 'websiteData' | 'activePage'> & { node: WebsiteNode, theme: ThemeConfig }> = (props) => {
+const NodeRenderer: React.FC<Omit<PreviewProps, 'websiteData' | 'activePage'> & { node: WebsiteNode, theme: ThemeConfig, websiteData: WebsiteData, context: 'page' | 'header' | 'footer' }> = (props) => {
     const { node, theme, device = 'desktop' } = props;
 
     if (!node || !node.id || !node.type) { return null; }
     
+    const isVisible = node.visibility?.[device] !== false;
+    if (!isVisible && props.interactive) {
+         // Show a placeholder for hidden items in the editor
+        return (
+             <div className="p-2 text-center text-xs text-slate-400 bg-slate-100 border-dashed border">
+                Hidden on {device}
+            </div>
+        )
+    }
+    if (!isVisible && !props.interactive) return null;
+
+
     const isSelected = props.interactive && props.selectedNodeId === node.id;
     const isHovered = props.interactive && props.hoveredNodeId === node.id && !isSelected;
     const mergedStyles = mergeStylesForDevice(node.styles, device);
+
+    const QuickAddButton = () => (
+      props.interactive && props.onAddSection && (
+        <div className="quick-add-button-wrapper">
+          <div className="quick-add-button">
+            <button onClick={() => props.onAddSection?.(props.context)}>
+              <PlusIcon className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      )
+    );
 
     if (!('children' in node) || !Array.isArray(node.children)) {
       return (
         <InteractiveWrapper {...props} node={node} isSelected={isSelected} isHovered={isHovered}>
             <div style={mergedStyles}>
-                <ElementRenderer element={node as IElement} theme={theme} interactive={props.interactive} onUpdateNode={props.onUpdateNode} />
+                <ElementRenderer element={node as IElement} theme={theme} websiteData={props.websiteData} interactive={props.interactive} onUpdateNode={props.onUpdateNode} />
             </div>
         </InteractiveWrapper>
       );
@@ -267,6 +323,7 @@ const NodeRenderer: React.FC<Omit<PreviewProps, 'websiteData' | 'activePage'> & 
                     ))
                 }
             </Tag>
+             {node.type === 'section' && <QuickAddButton />}
         </InteractiveWrapper>
     );
 };
@@ -274,32 +331,52 @@ const NodeRenderer: React.FC<Omit<PreviewProps, 'websiteData' | 'activePage'> & 
 const Preview: React.FC<PreviewProps> = (props) => {
   const { websiteData, activePage } = props;
   const theme = useMemo(() => themeConfigs[websiteData.theme] || themeConfigs.light, [websiteData.theme]);
+  const fontFamilyStyle = websiteData.googleFont ? { fontFamily: `'${websiteData.googleFont}', sans-serif` } : {};
+
 
   return (
-    <div className={`w-full h-full overflow-y-auto ${theme.bg} ${theme.text} transition-colors duration-300`}>
-      <header className={`p-6 sticky top-0 ${theme.bg} bg-opacity-80 backdrop-blur-sm z-20`}>
-        <h1 className={`text-2xl font-bold ${theme.headerText}`}>{websiteData.name}</h1>
-      </header>
+    <div className={`w-full h-full overflow-y-auto ${theme.bg} ${theme.text} transition-colors duration-300`} style={fontFamilyStyle}>
+      
+      {websiteData.header.length > 0 &&
+        <header className="w-full">
+            {websiteData.header.map(section => (
+                <NodeRenderer key={section.id} {...props} node={section} theme={theme} context="header" />
+            ))}
+        </header>
+      }
 
-      <section className="relative h-72">
-        <img src={activePage.heroImageUrl} alt={`${activePage.name} hero image`} className="w-full h-full object-cover" />
-        <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center p-6">
-          <div className="text-center">
-            <h2 className="text-4xl font-extrabold text-white">{activePage.name}</h2>
-            <p className="mt-2 text-lg text-slate-200">{activePage.tagline}</p>
+      {/* Hero for the current page */}
+      {!props.interactive && (
+        <section className="relative h-72">
+          <img src={activePage.heroImageUrl} alt={`${activePage.name} hero image`} className="w-full h-full object-cover" />
+          <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center p-6">
+            <div className="text-center">
+              <h2 className="text-4xl font-extrabold text-white">{activePage.name}</h2>
+              <p className="mt-2 text-lg text-slate-200">{activePage.tagline}</p>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       <main>
         {activePage.children && activePage.children.filter(Boolean).map(section => (
-            <NodeRenderer key={section.id} {...props} node={section} theme={theme} />
+            <NodeRenderer key={section.id} {...props} node={section} theme={theme} context="page" />
         ))}
       </main>
 
-      <footer className={`py-6 px-6 text-center ${theme.footerBg} ${theme.footerText}`}>
-        <p>&copy; {new Date().getFullYear()} {websiteData.name}. All rights reserved.</p>
-      </footer>
+      {websiteData.footer.length > 0 &&
+        <footer className={`w-full ${theme.footerBg} ${theme.footerText}`}>
+            {websiteData.footer.map(section => (
+                <NodeRenderer key={section.id} {...props} node={section} theme={theme} context="footer" />
+            ))}
+        </footer>
+      }
+
+      {!websiteData.footer.length &&
+        <footer className={`py-6 px-6 text-center ${theme.footerBg} ${theme.footerText}`}>
+          <p>&copy; {new Date().getFullYear()} {websiteData.name}. All rights reserved.</p>
+        </footer>
+      }
     </div>
   );
 };
